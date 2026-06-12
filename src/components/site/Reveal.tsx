@@ -9,15 +9,15 @@ type RevealProps = {
   once?: boolean;
 } & MotionProps;
 
-export function Reveal({ children, delay = 0, y = 28, className, once = true, ...rest }: RevealProps) {
+export function Reveal({ children, delay = 0, y = 20, className, once = true, ...rest }: RevealProps) {
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once, margin: "-80px" });
   return (
     <motion.div
       ref={ref}
-      initial={{ opacity: 0, y, filter: "blur(8px)" }}
-      animate={inView ? { opacity: 1, y: 0, filter: "blur(0px)" } : {}}
-      transition={{ duration: 0.9, delay, ease: [0.22, 1, 0.36, 1] }}
+      initial={{ opacity: 0, y }}
+      animate={inView ? { opacity: 1, y: 0 } : {}}
+      transition={{ duration: 0.7, delay, ease: [0.22, 1, 0.36, 1] }}
       className={className}
       {...rest}
     >

@@ -430,7 +430,7 @@ function Financing() {
     <section id="financing" className="container-x py-24 md:py-32">
       <Reveal>
         <div className="relative overflow-hidden rounded-[2rem] border border-primary/20 bg-primary-soft/60 p-8 md:p-16">
-          <div className="absolute -top-32 -right-32 h-72 w-72 rounded-full bg-gradient-green opacity-20 blur-3xl animate-float-y" />
+          <div className="absolute -top-32 -right-32 hidden h-72 w-72 rounded-full bg-gradient-green opacity-20 blur-3xl animate-float-y md:block" />
 
           <div className="relative grid gap-12 lg:grid-cols-[1fr_1.4fr]">
             <div>
@@ -452,13 +452,13 @@ function Financing() {
                 <Reveal key={p.title} delay={i * 0.12}>
                   <motion.div
                     whileHover={{ x: 6 }} transition={{ type: "spring", stiffness: 300 }}
-                    className="flex items-start gap-5 rounded-2xl border border-border bg-card p-5 md:p-6 hover:border-primary/40 transition-colors"
+                    className="flex flex-col items-start gap-4 rounded-2xl border border-border bg-card p-5 transition-colors hover:border-primary/40 sm:flex-row sm:gap-5 md:p-6"
                   >
-                    <div className="flex h-16 w-24 shrink-0 flex-col items-center justify-center rounded-xl bg-gradient-animated px-1 text-primary-foreground sm:w-20">
+                    <div className="flex h-16 w-28 shrink-0 flex-col items-center justify-center rounded-xl bg-gradient-animated px-1 text-primary-foreground sm:w-20">
                       <div className="whitespace-nowrap text-sm font-bold leading-none sm:text-base">{p.rate}</div>
                       <div className="mt-1 text-[9px] uppercase tracking-wider opacity-90">{p.tag}</div>
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <h3 className="text-base font-semibold">{p.title}</h3>
                       <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{p.text}</p>
                     </div>

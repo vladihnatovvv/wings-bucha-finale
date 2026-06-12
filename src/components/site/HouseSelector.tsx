@@ -39,18 +39,18 @@ export function HouseSelector() {
       {/* Animated background blobs */}
       <motion.div
         aria-hidden
-        className="absolute -top-40 -right-40 h-[28rem] w-[28rem] rounded-full bg-primary/15 blur-3xl"
+        className="absolute -top-40 -right-40 hidden h-[28rem] w-[28rem] rounded-full bg-primary/15 blur-3xl md:block"
         animate={{ x: [0, 40, -20, 0], y: [0, -30, 20, 0], scale: [1, 1.1, 0.95, 1] }}
         transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
       />
       <motion.div
         aria-hidden
-        className="absolute -bottom-40 -left-40 h-[28rem] w-[28rem] rounded-full bg-primary/10 blur-3xl"
+        className="absolute -bottom-40 -left-40 hidden h-[28rem] w-[28rem] rounded-full bg-primary/10 blur-3xl md:block"
         animate={{ x: [0, -30, 20, 0], y: [0, 25, -15, 0], scale: [1, 0.9, 1.05, 1] }}
         transition={{ duration: 22, repeat: Infinity, ease: "easeInOut" }}
       />
       {/* Floating sparkles */}
-      <div aria-hidden className="pointer-events-none absolute inset-0">
+      <div aria-hidden className="pointer-events-none absolute inset-0 hidden md:block">
         {[...Array(6)].map((_, i) => (
           <motion.span
             key={i}
@@ -251,7 +251,7 @@ export function HouseSelector() {
                           key={active.img}
                           src={active.img}
                           alt={active.name}
-                          initial={{ scale: 1.18, opacity: 0 }}
+                          initial={{ scale: 1.08, opacity: 0 }}
                           animate={{ scale: 1, opacity: 1 }}
                           transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
                           className="h-full w-full object-cover transition-transform duration-700 group-hover/img:scale-105"
