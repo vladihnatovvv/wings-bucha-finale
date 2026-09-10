@@ -1,0 +1,102 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model HouseType {
+  id          String   @id
+  label       String
+  pluralLabel String   @map("plural_label")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("house_types")
+}
+
+model House {
+  id            String   @id
+  name          String
+  type          String
+  img           String   @db.Text
+  facade        String   @db.Text
+  area          Float
+  beds          Int
+  baths         Int
+  floors        Int
+  plot          Float
+  priceUsd      Int      @map("price_usd")
+  priceUah      Int?     @map("price_uah")
+  priceCurrency String   @default("USD") @map("price_currency")
+  available     Int
+  features      String[]
+  floorPlans    Json     @map("floor_plans")
+  unitPlans     Json     @map("unit_plans")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("houses")
+}
+
+model Lead {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  name      String
+  phone     String
+  email     String   @default("")
+  interest  String   @default("")
+  message   String   @default("") @db.Text
+  status    String   @default("new")
+
+  @@map("leads")
+}
+
+model SiteContacts {
+  id          Int      @id @default(1)
+  phoneDisplay String  @map("phone_display")
+  phoneHref    String  @map("phone_href")
+  email        String
+  telegramUrl  String  @map("telegram_url")
+  whatsappUrl  String  @map("whatsapp_url")
+  address      String
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("site_contacts")
+}
+
+model SiteDocument {
+  id          String   @id
+  title       String
+  description String   @default("") @db.Text
+  fileUrl     String   @default("") @map("file_url") @db.Text
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("site_documents")
+}
+
+model ConstructionUpdate {
+  id          String   @id
+  date        DateTime
+  title       String
+  description String   @default("") @db.Text
+  image       String   @default("") @db.Text
+  progress    Int      @default(0)
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("construction_updates")
+}
+
+model SiteSettings {
+  id                  Int      @id @default(1)
+  scrollMediaVideoUrl String   @default("") @map("scroll_media_video_url") @db.Text
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  @@map("site_settings")
+}

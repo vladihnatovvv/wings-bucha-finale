@@ -11,10 +11,13 @@ node_modules
 dist
 dist-ssr
 .output
+output
 .vinxi
 .tanstack/**
 .nitro
+.playwright-cli
 *.local
+*.zip
 
 # Wrangler / Cloudflare
 .wrangler/

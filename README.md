@@ -1,117 +1,141 @@
 # Wings Bucha — Крила Бучі
 
-Лендінг житлового комплексу `Wings Bucha` у Бучі.
+Лендінг житлового комплексу "Wings Bucha" у Бучі.
 
-## Стек
+## Технологічний стек
 
 - React 19 + TypeScript
-- TanStack Start / Router
+- TanStack Start / Router (file-based routing)
 - Tailwind CSS v4
 - Vite 7
-- Cloudflare Vite plugin
+- Bun (як пакетний менеджер; альтернативно — npm/pnpm)
 
-## Локальний запуск
+## Локальна розробка
 
-Рекомендований варіант через `npm`:
-
-```bash
-npm install
-npm run dev
-```
-
-Сайт відкриється на [http://localhost:5173](http://localhost:5173).
-
-Якщо у вас є Bun, можна так:
+Встановити залежності та запустити dev-сервер:
 
 ```bash
 bun install
 bun run dev
 ```
 
-## Продакшн-збірка
+Сайт відкриється на http://localhost:5173
+
+Якщо немає Bun — підійде `npm install && npm run dev` або `pnpm install && pnpm dev`.
+
+## Збірка для продакшну
 
 ```bash
-npm run build
+bun run build
 ```
 
-Після збірки створюються:
+Після збірки в папці `.output/` будуть готові файли для деплою:
+- `.output/public/` — статичні асети (HTML, JS, CSS, зображення)
+- `.output/server/` — серверний бандл (для SSR)
 
-- `dist/client/` — клієнтські асети
-- `dist/server/` — SSR-бандл
+## Деплой на сервер замовника
 
-## Деплой
+Проєкт підтримує **три способи деплою** залежно від інфраструктури:
 
-Проєкт підготовлений у двох сценаріях:
+### Варіант 1. Статичний хостинг (nginx / Apache) — найпростіше
 
-- звичайний сервер або VPS з `Node.js + nginx`
-- `Cloudflare Workers`
+Підходить для звичайного VPS або shared-хостингу. Сайт працює як SPA.
 
-Для передачі системному адміну дивіться [DEPLOY-HOSTING.md](/Users/ihnatovvladgmail.com/Downloads/wings-bucha/DEPLOY-HOSTING.md).
+1. Локально виконати `bun run build`.
+2. Завантажити вміст папки `.output/public/` у кореневу директорію сайту на сервері (наприклад, `/var/www/wings-bucha/`).
+3. Налаштувати nginx так, щоб усі невідомі шляхи віддавали `index.html` (для клієнтського роутингу):
 
-### Рекомендований варіант для сервера замовника
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;
+    root /var/www/wings-bucha;
+    index index.html;
 
-Для звичайного VPS або хостингу з доступом до `Node.js` використовуйте:
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Кешування статики
+    location ~* \.(js|css|png|jpg|jpeg|gif|webp|svg|woff2)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+}
+```
+
+Для Apache аналогічно через `.htaccess`:
+
+```apache
+RewriteEngine On
+RewriteBase /
+RewriteRule ^index\.html$ - [L]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule . /index.html [L]
+```
+
+### Варіант 2. Node.js-сервер (з SSR)
+
+Якщо на сервері встановлено Node.js 20+ і потрібен повноцінний серверний рендеринг:
+
+1. Завантажити весь проєкт на сервер.
+2. Виконати:
 
 ```bash
-npm ci
-npm run build
-npm run start
+bun install --production   # або: npm ci
+bun run build
 ```
 
-Готові серверні файли:
-
-- [deploy/node-server.mjs](/Users/ihnatovvladgmail.com/Downloads/wings-bucha/deploy/node-server.mjs)
-- [deploy/nginx.conf](/Users/ihnatovvladgmail.com/Downloads/wings-bucha/deploy/nginx.conf)
-- [deploy/wings-bucha.service](/Users/ihnatovvladgmail.com/Downloads/wings-bucha/deploy/wings-bucha.service)
-
-### Cloudflare як опція
-
-### Що вже готово
-
-- є `wrangler.jsonc`
-- додано `wrangler` у devDependencies
-- додано готові команди для preview і deploy
-- `wrangler` налаштований на деплой з `dist/server/server.js` і `dist/client/`
-- збірка проєкту перевірена через `npm run build`
-
-### Перший деплой
-
-1. Авторизуватись у Cloudflare:
+3. Запустити сервер (через PM2/systemd):
 
 ```bash
-npx wrangler login
+node .output/server/index.mjs
 ```
 
-2. За потреби змінити назву сервісу у [wrangler.jsonc](/Users/ihnatovvladgmail.com/Downloads/wings-bucha/wrangler.jsonc).
+За замовчуванням слухатиме порт 3000 — пропустити через nginx як reverse proxy.
 
-3. Викотити застосунок:
+### Варіант 3. Docker
+
+Створити `Dockerfile`:
+
+```dockerfile
+FROM oven/bun:1 AS builder
+WORKDIR /app
+COPY . .
+RUN bun install --frozen-lockfile
+RUN bun run build
+
+FROM nginx:alpine
+COPY --from=builder /app/.output/public /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
+```
+
+Зібрати та запустити:
 
 ```bash
-npm run cf:deploy
+docker build -t wings-bucha .
+docker run -d -p 80:80 wings-bucha
 ```
 
-### Локальна перевірка Cloudflare-рантайму
+## Структура проєкту
 
-```bash
-npm run cf:preview
-```
-
-### Важливо
-
-- На зараз у проєкті немає обов'язкових env-змінних для деплою.
-- Якщо пізніше з'являться форми, CRM, аналітика або API-ключі, їх краще додавати через `wrangler secret put`.
-- Старі інструкції з `.output/` більше неактуальні для цього репозиторію: фактичний build-output зараз у `dist/`.
-- `wrangler` тут не збирає `src/server.ts` напряму: він деплоїть уже підготовлений build-артефакт після `npm run build`.
-
-## Структура
-
-- `src/routes/` — сторінки
-- `src/components/site/` — компоненти лендингу
-- `src/components/ui/` — базові UI-компоненти
+- `src/routes/` — сторінки (file-based routing)
+  - `index.tsx` — головна
+  - `house.$id.tsx` — сторінка окремого будинку
+  - `compare.tsx` — порівняння будинків
+  - `__root.tsx` — кореневий лейаут і метатеги
+- `src/components/site/` — UI-компоненти лендингу
+- `src/components/ui/` — базові shadcn-компоненти
 - `src/lib/houses.ts` — дані про будинки
-- `src/styles.css` — глобальні стилі
-- `public/` — статичні ресурси
+- `src/styles.css` — глобальні стилі і дизайн-токени
+- `public/` — статичні ресурси (зображення, og-image, favicon)
 
 ## Контент
 
-Дані про будинки зберігаються у [src/lib/houses.ts](/Users/ihnatovvladgmail.com/Downloads/wings-bucha/src/lib/houses.ts). Якщо треба змінити ціни, площі, назви або характеристики, це основний файл для редагування.
+Дані про будинки — у файлі `src/lib/houses.ts`. Щоб додати/відредагувати будинок, правте цей масив; зображення додавайте в `public/` і посилайтесь на них шляхами `/назва-файлу.jpg`.
+
+## Підтримка
+
+Проєкт побудований на стандартному відкритому стеку (React + Vite + TanStack). Будь-який React-розробник зможе його підтримувати без спеціальних знань.

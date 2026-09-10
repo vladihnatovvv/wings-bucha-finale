@@ -32,7 +32,9 @@ export const getRouter = () => {
       return (
         <div className="flex min-h-screen items-center justify-center bg-background px-4">
           <div className="max-w-md text-center">
-            <h1 className="text-xl font-semibold tracking-tight text-foreground">Сторінка не завантажилась</h1>
+            <h1 className="text-xl font-semibold tracking-tight text-foreground">
+              Сторінка не завантажилась
+            </h1>
             <p className="mt-2 text-sm text-muted-foreground">
               Сталася помилка. Спробуйте оновити сторінку або поверніться на головну.
             </p>

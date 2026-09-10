@@ -1,16 +1,37 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { ArrowLeft, ArrowRight, Check, Bed, Ruler, Home as HomeIcon, Layers, LayoutGrid, Scale } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  Bed,
+  Ruler,
+  Home as HomeIcon,
+  Layers,
+  LayoutGrid,
+  Scale,
+} from "lucide-react";
 import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { FloatingContacts } from "@/components/site/FloatingContacts";
 import { Toaster } from "@/components/ui/sonner";
-import { HOUSES, fmtUsd, fmtUah, type House } from "@/lib/houses";
+import {
+  fmtHousePrice,
+  fmtHouseSecondaryPrice,
+  getHouse,
+  getHouses,
+  getHouseTypeLabel,
+  getUnitStatusLabel,
+  type House,
+  type UnitStatus,
+} from "@/lib/houses";
+import { getHouseByIdFn, listHousesFn } from "@/lib/content.functions";
 
 export const Route = createFileRoute("/house/$id")({
-  loader: ({ params }): { house: House } => {
-    const house = HOUSES.find((h) => h.id === params.id);
+  loader: async ({ params }): Promise<{ house: House }> => {
+    const house = (await getHouseByIdFn({ data: { id: params.id } })) ?? getHouse(params.id);
     if (!house) throw notFound();
     return { house };
   },
@@ -18,7 +39,7 @@ export const Route = createFileRoute("/house/$id")({
     const h = loaderData?.house;
     if (!h) return { meta: [{ title: "Будинок — Wings Bucha" }] };
     const title = `${h.name} — Wings Bucha`;
-    const description = `${h.area} м², ${h.beds} спальні, ${h.floors} поверхи. Ціна від ${fmtUsd(h.priceUsd)}.`;
+    const description = `${h.area} м², ${h.beds} спальні, ${h.floors} поверхи. Ціна від ${fmtHousePrice(h)}.`;
     return {
       meta: [
         { title },
@@ -60,13 +81,45 @@ export const Route = createFileRoute("/house/$id")({
 type Tab = "facade" | "floor" | "unit";
 
 function HousePage() {
-  const { house } = Route.useLoaderData() as { house: House };
+  const getHouseByIdServer = useServerFn(getHouseByIdFn);
+  const listHousesServer = useServerFn(listHousesFn);
+  const { house: loaderHouse } = Route.useLoaderData() as { house: House };
+  const [house, setHouse] = useState(loaderHouse);
+  const [others, setOthers] = useState(() =>
+    getHouses()
+      .filter((h) => h.id !== loaderHouse.id)
+      .slice(0, 3),
+  );
   const [tab, setTab] = useState<Tab>("facade");
   const [floorIdx, setFloorIdx] = useState(0);
   const [unitIdx, setUnitIdx] = useState(0);
 
-  const typeLabel = house.type === "duplex" ? "Дуплекс" : house.type === "townhouse" ? "Таунхаус" : "Котедж";
-  const others = HOUSES.filter((h) => h.id !== house.id).slice(0, 3);
+  const typeLabel = getHouseTypeLabel(house.type);
+
+  useEffect(() => {
+    setHouse(loaderHouse);
+  }, [loaderHouse]);
+
+  useEffect(() => {
+    let alive = true;
+    Promise.all([getHouseByIdServer({ data: { id: loaderHouse.id } }), listHousesServer()])
+      .then(([serverHouse, houses]) => {
+        if (!alive) return;
+        if (serverHouse) setHouse(serverHouse);
+        setOthers(houses.filter((h) => h.id !== loaderHouse.id).slice(0, 3));
+      })
+      .catch(() => {
+        if (!alive) return;
+        setOthers(
+          getHouses()
+            .filter((h) => h.id !== loaderHouse.id)
+            .slice(0, 3),
+        );
+      });
+    return () => {
+      alive = false;
+    };
+  }, [getHouseByIdServer, listHousesServer, loaderHouse.id]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -108,22 +161,44 @@ function HousePage() {
                 transition={{ duration: 0.6, delay: 0.1 }}
                 className="flex flex-col"
               >
-                <span className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">{typeLabel}</span>
+                <span className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+                  {typeLabel}
+                </span>
                 <h1 className="mt-2 text-4xl font-bold tracking-tight md:text-5xl">{house.name}</h1>
                 <div className="mt-4 flex flex-wrap items-baseline gap-x-4 gap-y-1">
-                  <span className="text-3xl font-bold text-foreground">{fmtUsd(house.priceUsd)}</span>
-                  <span className="text-sm text-muted-foreground">≈ {fmtUah(house.priceUsd)}</span>
+                  <span className="text-3xl font-bold text-foreground">{fmtHousePrice(house)}</span>
+                  <span className="text-sm text-muted-foreground">
+                    {fmtHouseSecondaryPrice(house)}
+                  </span>
                 </div>
 
                 <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-2">
-                  <Stat icon={<Ruler className="h-4 w-4" />} label="Площа" value={`${house.area} м²`} />
-                  <Stat icon={<Bed className="h-4 w-4" />} label="Спальні" value={String(house.beds)} />
-                  <Stat icon={<Layers className="h-4 w-4" />} label="Поверхи" value={String(house.floors)} />
-                  <Stat icon={<HomeIcon className="h-4 w-4" />} label="Ділянка" value={`${house.plot} сот`} />
+                  <Stat
+                    icon={<Ruler className="h-4 w-4" />}
+                    label="Площа"
+                    value={`${house.area} м²`}
+                  />
+                  <Stat
+                    icon={<Bed className="h-4 w-4" />}
+                    label="Спальні"
+                    value={String(house.beds)}
+                  />
+                  <Stat
+                    icon={<Layers className="h-4 w-4" />}
+                    label="Поверхи"
+                    value={String(house.floors)}
+                  />
+                  <Stat
+                    icon={<HomeIcon className="h-4 w-4" />}
+                    label="Ділянка"
+                    value={`${house.plot} сот`}
+                  />
                 </div>
 
                 <div className="mt-6">
-                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Особливості</div>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Особливості
+                  </div>
                   <ul className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                     {house.features.map((f) => (
                       <li key={f} className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -161,13 +236,25 @@ function HousePage() {
         {/* Tabs: facade / floor / unit */}
         <section className="container-x mt-16 md:mt-24">
           <div className="flex flex-wrap items-center gap-2 border-b border-border pb-3">
-            <TabBtn active={tab === "facade"} onClick={() => setTab("facade")} icon={<HomeIcon className="h-4 w-4" />}>
+            <TabBtn
+              active={tab === "facade"}
+              onClick={() => setTab("facade")}
+              icon={<HomeIcon className="h-4 w-4" />}
+            >
               Фасад
             </TabBtn>
-            <TabBtn active={tab === "floor"} onClick={() => setTab("floor")} icon={<Layers className="h-4 w-4" />}>
+            <TabBtn
+              active={tab === "floor"}
+              onClick={() => setTab("floor")}
+              icon={<Layers className="h-4 w-4" />}
+            >
               Планування поверху
             </TabBtn>
-            <TabBtn active={tab === "unit"} onClick={() => setTab("unit")} icon={<LayoutGrid className="h-4 w-4" />}>
+            <TabBtn
+              active={tab === "unit"}
+              onClick={() => setTab("unit")}
+              icon={<LayoutGrid className="h-4 w-4" />}
+            >
               Планування квартир
             </TabBtn>
           </div>
@@ -196,7 +283,11 @@ function HousePage() {
                     transition={{ duration: 0.3 }}
                     className="absolute inset-0 flex items-center justify-center p-6"
                   >
-                    <img src={house.floorPlans[floorIdx].img} alt={house.floorPlans[floorIdx].label} className="max-h-full max-w-full" />
+                    <img
+                      src={house.floorPlans[floorIdx].img}
+                      alt={house.floorPlans[floorIdx].label}
+                      className="max-h-full max-w-full"
+                    />
                   </motion.div>
                 )}
                 {tab === "unit" && (
@@ -208,7 +299,15 @@ function HousePage() {
                     transition={{ duration: 0.3 }}
                     className="absolute inset-0 flex items-center justify-center p-6"
                   >
-                    <img src={house.unitPlans[unitIdx].img} alt={house.unitPlans[unitIdx].label} className="max-h-full max-w-full" />
+                    <img
+                      src={house.unitPlans[unitIdx].img}
+                      alt={house.unitPlans[unitIdx].label}
+                      className="max-h-full max-w-full"
+                    />
+                    <UnitStatusBadge
+                      status={house.unitPlans[unitIdx].status}
+                      className="absolute right-5 top-5"
+                    />
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -220,7 +319,9 @@ function HousePage() {
                       key={p.label}
                       onClick={() => setFloorIdx(i)}
                       className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
-                        i === floorIdx ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                        i === floorIdx
+                          ? "bg-primary text-primary-foreground"
+                          : "text-muted-foreground hover:text-foreground"
                       }`}
                     >
                       {p.label}
@@ -235,10 +336,12 @@ function HousePage() {
                       key={p.label}
                       onClick={() => setUnitIdx(i)}
                       className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
-                        i === unitIdx ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                        i === unitIdx
+                          ? "bg-primary text-primary-foreground"
+                          : "text-muted-foreground hover:text-foreground"
                       }`}
                     >
-                      {p.label} · {p.area} м²
+                      {p.label} · {p.area} м² · {getUnitStatusLabel(p.status)}
                     </button>
                   ))}
                 </div>
@@ -252,7 +355,11 @@ function HousePage() {
           <section className="container-x mt-20 md:mt-28 pb-24 md:pb-32">
             <div className="flex items-end justify-between">
               <h2 className="text-2xl font-bold md:text-3xl">Інші формати</h2>
-              <Link to="/" hash="houses" className="text-sm font-semibold text-primary hover:underline">
+              <Link
+                to="/"
+                hash="houses"
+                className="text-sm font-semibold text-primary hover:underline"
+              >
                 Усі будинки →
               </Link>
             </div>
@@ -272,6 +379,21 @@ function HousePage() {
   );
 }
 
+function UnitStatusBadge({ status, className = "" }: { status?: UnitStatus; className?: string }) {
+  const normalized = status ?? "available";
+  const classes = {
+    available: "bg-emerald-100 text-emerald-800",
+    reserved: "bg-amber-100 text-amber-800",
+    sold: "bg-rose-100 text-rose-800",
+  }[normalized];
+
+  return (
+    <span className={`rounded-full px-3 py-1.5 text-xs font-bold ${classes} ${className}`}>
+      {getUnitStatusLabel(normalized)}
+    </span>
+  );
+}
+
 function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
     <div className="rounded-2xl border border-border bg-card p-4">
@@ -279,12 +401,24 @@ function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; va
         {icon}
         {label}
       </div>
-      <div className="mt-1.5 whitespace-nowrap text-lg font-bold text-foreground md:text-xl">{value}</div>
+      <div className="mt-1.5 whitespace-nowrap text-lg font-bold text-foreground md:text-xl">
+        {value}
+      </div>
     </div>
   );
 }
 
-function TabBtn({ active, onClick, icon, children }: { active: boolean; onClick: () => void; icon: React.ReactNode; children: React.ReactNode }) {
+function TabBtn({
+  active,
+  onClick,
+  icon,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <button
       onClick={onClick}
@@ -306,16 +440,24 @@ function OtherCard({ h }: { h: House }) {
       className="group overflow-hidden rounded-2xl border border-border bg-card transition-all hover:-translate-y-1 hover:border-primary/40 hover:shadow-soft"
     >
       <div className="aspect-[16/11] overflow-hidden bg-secondary">
-        <img src={h.img} alt={h.name} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
+        <img
+          src={h.img}
+          alt={h.name}
+          className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+        />
       </div>
       <div className="p-5">
         <h3 className="text-base font-bold">{h.name}</h3>
         <div className="mt-1.5 flex items-center gap-3 text-xs text-muted-foreground">
-          <span className="inline-flex items-center gap-1"><Ruler className="h-3 w-3" /> {h.area} м²</span>
-          <span className="inline-flex items-center gap-1"><Bed className="h-3 w-3" /> {h.beds}</span>
+          <span className="inline-flex items-center gap-1">
+            <Ruler className="h-3 w-3" /> {h.area} м²
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <Bed className="h-3 w-3" /> {h.beds}
+          </span>
         </div>
         <div className="mt-3 flex items-center justify-between">
-          <span className="text-sm font-bold">{fmtUsd(h.priceUsd)}</span>
+          <span className="text-sm font-bold">{fmtHousePrice(h)}</span>
           <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary">
             Деталі <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-1" />
           </span>

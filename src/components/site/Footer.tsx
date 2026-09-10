@@ -1,6 +1,27 @@
+import { useServerFn } from "@tanstack/react-start";
+import { useEffect, useState } from "react";
 import logo from "@/assets/logo-wings.png";
+import { DEFAULT_CONTACTS, readSiteContacts } from "@/lib/admin-store";
+import { readSiteContactsFn } from "@/lib/content.functions";
 
 export function Footer() {
+  const readSiteContactsServer = useServerFn(readSiteContactsFn);
+  const [contacts, setContacts] = useState(DEFAULT_CONTACTS);
+
+  useEffect(() => {
+    let alive = true;
+    readSiteContactsServer()
+      .then((serverContacts) => {
+        if (alive) setContacts(serverContacts);
+      })
+      .catch(() => {
+        if (alive) setContacts(readSiteContacts());
+      });
+    return () => {
+      alive = false;
+    };
+  }, [readSiteContactsServer]);
+
   return (
     <footer className="border-t border-border bg-secondary/50">
       <div className="container-x py-14">
@@ -10,20 +31,31 @@ export function Footer() {
               <img src={logo} alt="Wings Bucha" className="h-10 w-10" width={40} height={40} />
               <div>
                 <div className="text-base font-bold">WINGS BUCHA</div>
-                <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Крила Бучі</div>
+                <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                  Крила Бучі
+                </div>
               </div>
             </div>
             <p className="mt-5 max-w-md text-sm leading-relaxed text-muted-foreground">
-              Сучасний житловий комплекс серед лісу, у 15 хвилинах від Києва. Дім, де народжуються крила.
+              Сучасний житловий комплекс серед лісу, у 15 хвилинах від Києва. Дім, де народжуються
+              крила.
             </p>
           </div>
 
           <div>
             <h4 className="text-sm font-semibold">Контакти</h4>
             <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
-              <li><a href="tel:+380000000000" className="hover:text-primary">+38 (000) 000-00-00</a></li>
-              <li><a href="mailto:info@wingsbucha.com" className="hover:text-primary">info@wingsbucha.com</a></li>
-              <li>м. Буча, вул. Лісова, 28</li>
+              <li>
+                <a href={`tel:${contacts.phoneHref}`} className="hover:text-primary">
+                  {contacts.phoneDisplay}
+                </a>
+              </li>
+              <li>
+                <a href={`mailto:${contacts.email}`} className="hover:text-primary">
+                  {contacts.email}
+                </a>
+              </li>
+              <li>{contacts.address}</li>
             </ul>
           </div>
 

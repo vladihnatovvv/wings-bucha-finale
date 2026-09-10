@@ -33,6 +33,20 @@ npm run start
 
 За замовчуванням застосунок стартує на порту `3000`.
 
+## Env-змінні
+
+Перед `npm run build` на сервері треба задати:
+
+```bash
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/wingsbucha_db?schema=public"
+ADMIN_PASSWORD="надійний-пароль-для-адмінки"
+ADMIN_SESSION_SECRET="довгий-випадковий-секрет-для-cookie"
+UPLOAD_DIR="public/uploads"
+PUBLIC_UPLOAD_BASE_URL="/uploads"
+```
+
+Якщо `DATABASE_URL` заданий, під час `npm run build` автоматично виконаються Prisma-міграції.
+
 ## Запуск як сервіс
 
 У папці [deploy/wings-bucha.service](/Users/ihnatovvladgmail.com/Downloads/wings-bucha/deploy/wings-bucha.service) є готовий `systemd` unit.
@@ -66,4 +80,4 @@ sudo systemctl status wings-bucha
 - Перед запуском у продакшні треба обов'язково виконати `npm run build`
 - Серверний запуск іде через [deploy/node-server.mjs](/Users/ihnatovvladgmail.com/Downloads/wings-bucha/deploy/node-server.mjs)
 - Цей раннер сам віддає `dist/client` як статику і SSR-сторінки через `dist/server/server.js`
-- На зараз у проєкті немає обов'язкових секретів чи env-змінних
+- Для продакшену обов'язково потрібні `DATABASE_URL`, `ADMIN_PASSWORD` і `ADMIN_SESSION_SECRET`

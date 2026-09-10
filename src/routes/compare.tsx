@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { ArrowLeft, ArrowRight, Plus, Scale, X } from "lucide-react";
@@ -6,15 +7,32 @@ import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { FloatingContacts } from "@/components/site/FloatingContacts";
 import { Toaster } from "@/components/ui/sonner";
-import { HOUSES, fmtUsd, fmtUah, readCompare, writeCompare, type House } from "@/lib/houses";
+import {
+  fmtHousePrice,
+  fmtUahAmount,
+  fmtUsd,
+  getHousePriceUah,
+  getHouses,
+  readCompare,
+  writeCompare,
+  type House,
+} from "@/lib/houses";
+import { listHousesFn } from "@/lib/content.functions";
 
 export const Route = createFileRoute("/compare")({
   head: () => ({
     meta: [
       { title: "Порівняння будинків — Wings Bucha" },
-      { name: "description", content: "Порівняйте до 3 форматів житла Wings Bucha поруч: площа, спальні, ціна та особливості." },
+      {
+        name: "description",
+        content:
+          "Порівняйте до 3 форматів житла Wings Bucha поруч: площа, спальні, ціна та особливості.",
+      },
       { property: "og:title", content: "Порівняння будинків — Wings Bucha" },
-      { property: "og:description", content: "Зручне порівняння дуплексів, таунхаусів і котеджів Wings Bucha." },
+      {
+        property: "og:description",
+        content: "Зручне порівняння дуплексів, таунхаусів і котеджів Wings Bucha.",
+      },
     ],
   }),
   component: ComparePage,
@@ -28,24 +46,41 @@ const ROWS: { label: string; get: (h: House) => string }[] = [
   { label: "Ділянка", get: (h) => `${h.plot} сот` },
   { label: "Доступно", get: (h) => `${h.available} од.` },
   { label: "Ціна USD", get: (h) => fmtUsd(h.priceUsd) },
-  { label: "Ціна UAH", get: (h) => fmtUah(h.priceUsd) },
+  { label: "Ціна UAH", get: (h) => fmtUahAmount(getHousePriceUah(h)) },
 ];
 
 function ComparePage() {
+  const listHousesServer = useServerFn(listHousesFn);
   const [ids, setIds] = useState<string[]>([]);
+  const [allHouses, setAllHouses] = useState<House[]>(() => getHouses());
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    setIds(readCompare());
-    setHydrated(true);
-  }, []);
+    let alive = true;
+    listHousesServer()
+      .then((houses) => {
+        if (!alive) return;
+        setAllHouses(houses);
+        setIds(readCompare());
+        setHydrated(true);
+      })
+      .catch(() => {
+        if (!alive) return;
+        setAllHouses(getHouses());
+        setIds(readCompare());
+        setHydrated(true);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [listHousesServer]);
 
   useEffect(() => {
     if (hydrated) writeCompare(ids);
   }, [ids, hydrated]);
 
-  const houses = HOUSES.filter((h) => ids.includes(h.id));
-  const remaining = HOUSES.filter((h) => !ids.includes(h.id));
+  const houses = allHouses.filter((h) => ids.includes(h.id));
+  const remaining = allHouses.filter((h) => !ids.includes(h.id));
 
   const remove = (id: string) => setIds((p) => p.filter((x) => x !== id));
   const add = (id: string) => setIds((p) => (p.length >= 3 || p.includes(id) ? p : [...p, id]));
@@ -68,7 +103,9 @@ function ComparePage() {
               <Scale className="h-3.5 w-3.5" /> Порівняння
             </span>
             <h1 className="text-4xl font-bold tracking-tight md:text-6xl">
-              {houses.length === 0 ? "Оберіть формати для порівняння" : `Порівнюємо ${houses.length} формат${houses.length === 1 ? "" : "и"}`}
+              {houses.length === 0
+                ? "Оберіть формати для порівняння"
+                : `Порівнюємо ${houses.length} формат${houses.length === 1 ? "" : "и"}`}
             </h1>
             <p className="max-w-2xl text-muted-foreground">
               Додавайте до 3 будинків і порівнюйте їх характеристики поруч.
@@ -93,14 +130,17 @@ function ComparePage() {
             <div className="mt-12 overflow-x-auto">
               <div
                 className="grid min-w-[640px] gap-4"
-                style={{ gridTemplateColumns: `160px repeat(${Math.max(houses.length, 1)}, minmax(200px, 1fr))` }}
+                style={{
+                  gridTemplateColumns: `160px repeat(${Math.max(houses.length, 1)}, minmax(200px, 1fr))`,
+                }}
               >
                 <div />
                 {houses.map((h) => (
                   <motion.div
                     key={h.id}
                     layout
-                    initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
                     className="relative overflow-hidden rounded-2xl border border-border bg-card"
                   >
                     <div className="aspect-[4/3] overflow-hidden">
@@ -108,7 +148,9 @@ function ComparePage() {
                     </div>
                     <div className="p-4">
                       <div className="text-sm font-bold">{h.name}</div>
-                      <div className="mt-1 text-sm font-semibold text-primary">{fmtUsd(h.priceUsd)}</div>
+                      <div className="mt-1 text-sm font-semibold text-primary">
+                        {fmtHousePrice(h)}
+                      </div>
                     </div>
                     <button
                       onClick={() => remove(h.id)}
@@ -180,7 +222,9 @@ function CompareRow({ label, values, delay }: { label: string; values: string[];
   return (
     <>
       <motion.div
-        initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay }}
+        initial={{ opacity: 0, x: -10 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay }}
         className="flex items-center text-xs font-semibold uppercase tracking-wider text-muted-foreground"
       >
         {label}
@@ -188,7 +232,9 @@ function CompareRow({ label, values, delay }: { label: string; values: string[];
       {values.map((v, i) => (
         <motion.div
           key={i}
-          initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: delay + 0.05 + i * 0.04 }}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: delay + 0.05 + i * 0.04 }}
           className="flex items-center rounded-xl bg-secondary/50 px-4 py-3 text-sm font-semibold text-foreground"
         >
           {v}

@@ -95,10 +95,7 @@ function createRequest(req) {
     }
   }
 
-  const body =
-    req.method === "GET" || req.method === "HEAD"
-      ? undefined
-      : Readable.toWeb(req);
+  const body = req.method === "GET" || req.method === "HEAD" ? undefined : Readable.toWeb(req);
 
   return new Request(url, {
     method: req.method,
