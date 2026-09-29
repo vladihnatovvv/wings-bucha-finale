@@ -24,11 +24,7 @@ import { Footer } from "@/components/site/Footer";
 import { FloatingContacts } from "@/components/site/FloatingContacts";
 import { ContactForm } from "@/components/site/ContactForm";
 import { Reveal, Parallax } from "@/components/site/Reveal";
-import heroHouse from "@/assets/hero-house.jpg";
-import duplex from "@/assets/type-duplex.jpg";
-import townhouse from "@/assets/type-townhouse.jpg";
-import cottage from "@/assets/type-cottage.jpg";
-import masterplan from "@/assets/masterplan.jpg";
+import { siteAsset } from "@/lib/assets";
 import {
   DEFAULT_CONSTRUCTION_UPDATES,
   DEFAULT_CONTACTS,
@@ -58,9 +54,14 @@ const LazyCurrencyCalculator = lazy(() =>
     default: CurrencyCalculator,
   })),
 );
-const LazyToaster = lazy(() =>
-  import("@/components/ui/sonner").then(({ Toaster }) => ({ default: Toaster })),
-);
+const heroHouse = siteAsset("images/hero-house-640.webp");
+const heroHouseMedium = siteAsset("images/hero-house-800.webp");
+const heroHouseLarge = siteAsset("images/hero-house-1120.webp");
+const duplex = siteAsset("images/type-duplex-640.webp");
+const townhouse = siteAsset("images/type-townhouse-640.webp");
+const cottage = siteAsset("images/type-cottage-640.webp");
+const masterplan = siteAsset("images/masterplan-800.webp");
+const masterplanLarge = siteAsset("images/masterplan-1200.webp");
 
 const HOME_CANONICAL_URL = "https://wingsbucha.com/";
 
@@ -117,7 +118,6 @@ function Index() {
 
       <Footer />
       <FloatingContacts />
-      <IdleToaster />
     </div>
   );
 }
@@ -158,26 +158,6 @@ function LazyOnView({
     >
       {visible ? <Suspense fallback={null}>{children}</Suspense> : null}
     </div>
-  );
-}
-
-function IdleToaster() {
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    if ("requestIdleCallback" in window) {
-      const id = window.requestIdleCallback(() => setReady(true), { timeout: 2500 });
-      return () => window.cancelIdleCallback(id);
-    }
-    const id = window.setTimeout(() => setReady(true), 1500);
-    return () => window.clearTimeout(id);
-  }, []);
-
-  if (!ready) return null;
-  return (
-    <Suspense fallback={null}>
-      <LazyToaster position="top-center" richColors />
-    </Suspense>
   );
 }
 
@@ -236,12 +216,7 @@ function Hero() {
 
       <div className="container-x relative grid grid-cols-1 items-center gap-14 pt-12 pb-20 lg:grid-cols-12 lg:gap-10 lg:pt-20 lg:pb-28">
         {/* LEFT — copy */}
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
-          className="lg:col-span-6"
-        >
+        <div className="lg:col-span-6">
           <div className="inline-flex items-center gap-3 text-[11px] uppercase tracking-[0.32em] text-primary">
             <span className="h-px w-10 bg-primary" />
             Преміальний еко-квартал
@@ -284,19 +259,24 @@ function Hero() {
             <HeroStat value="15 хв" label="до центру Києва" />
             <HeroStat value="7 га" label="соснового лісу" />
           </div>
-        </motion.div>
+        </div>
 
         {/* RIGHT — image with floating cards */}
         <div className="relative lg:col-span-6">
           <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
+            initial={{ scale: 0.98 }}
+            animate={{ scale: 1 }}
+            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
             className="relative mx-auto aspect-[4/5] w-full max-w-[560px] overflow-hidden rounded-[120px] shadow-[0_40px_120px_-30px_oklch(0.42_0.075_150/0.35)] sm:rounded-[200px] lg:rounded-[280px]"
           >
             <motion.img
               src={heroHouse}
+              srcSet={`${heroHouse} 640w, ${heroHouseMedium} 800w, ${heroHouseLarge} 1120w`}
+              sizes="(min-width: 1024px) 46vw, 100vw"
               alt="Wings Bucha — резиденція серед сосен"
+              width={1120}
+              height={1400}
+              fetchPriority="high"
               style={{ y: imgY, scale: imgScale }}
               className="h-full w-full object-cover"
             />
@@ -382,6 +362,7 @@ function ScrollVideo() {
   const readSettingsServer = useServerFn(readSiteSettingsFn);
   const ref = useRef<HTMLDivElement>(null);
   const [settings, setSettings] = useState(DEFAULT_SITE_SETTINGS);
+  const [loadVideo, setLoadVideo] = useState(false);
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
 
   // Expand from small card to fullscreen during first ~50% of scroll, then hold fullscreen
@@ -404,6 +385,22 @@ function ScrollVideo() {
     };
   }, [readSettingsServer]);
 
+  useEffect(() => {
+    const element = ref.current;
+    if (!element || loadVideo) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setLoadVideo(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "300px 0px" },
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [loadVideo]);
+
   return (
     <section ref={ref} className="relative h-[300vh] bg-background md:h-[500vh]">
       <div className="sticky top-0 flex h-screen w-full items-center justify-center overflow-hidden bg-background">
@@ -413,13 +410,13 @@ function ScrollVideo() {
         >
           {videoSrc ? (
             <video
-              src={videoSrc}
-              poster={heroHouse}
+              src={loadVideo ? videoSrc : undefined}
+              poster={loadVideo ? heroHouseMedium : undefined}
               autoPlay
               muted
               loop
               playsInline
-              preload="metadata"
+              preload="none"
               className="absolute inset-0 h-full w-full object-cover"
             />
           ) : (
@@ -827,10 +824,13 @@ function Masterplan() {
             <div className="overflow-hidden rounded-[2rem] shadow-card hover-lift">
               <img
                 src={masterplan}
+                srcSet={`${masterplan} 800w, ${masterplanLarge} 1200w`}
+                sizes="(min-width: 768px) 60vw, 100vw"
                 alt="Генплан Wings Bucha"
-                width={1600}
-                height={1000}
+                width={1200}
+                height={750}
                 loading="lazy"
+                decoding="async"
                 className="h-full w-full object-cover"
               />
             </div>
@@ -905,14 +905,20 @@ function ConstructionProgress() {
                     <img
                       src={item.image}
                       alt={item.title}
+                      width={640}
+                      height={480}
                       loading="lazy"
+                      decoding="async"
                       className="h-full w-full object-cover"
                     />
                   ) : (
                     <img
                       src={heroHouse}
                       alt={item.title}
+                      width={640}
+                      height={480}
                       loading="lazy"
+                      decoding="async"
                       className="h-full w-full object-cover opacity-80"
                     />
                   )}

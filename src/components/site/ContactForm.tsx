@@ -1,6 +1,5 @@
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
 import { addLead } from "@/lib/admin-store";
 import { readHouseTypes } from "@/lib/houses";
 import { createLeadFn, listHouseTypesFn } from "@/lib/content.functions";
@@ -10,6 +9,7 @@ export function ContactForm() {
   const listHouseTypesServer = useServerFn(listHouseTypesFn);
   const [loading, setLoading] = useState(false);
   const [houseTypes, setHouseTypes] = useState(() => readHouseTypes());
+  const [notice, setNotice] = useState<{ type: "error" | "success"; text: string } | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -28,11 +28,18 @@ export function ContactForm() {
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = e.currentTarget;
-    const fd = new FormData(e.currentTarget);
+    const fd = new FormData(form);
     const name = String(fd.get("name") ?? "").trim();
     const phone = String(fd.get("phone") ?? "").trim();
-    if (name.length < 2 || name.length > 80) return toast.error("Введіть коректне ім'я");
-    if (!/^[+\d\s()-]{7,20}$/.test(phone)) return toast.error("Введіть коректний номер телефону");
+    if (name.length < 2 || name.length > 80) {
+      setNotice({ type: "error", text: "Введіть коректне ім'я" });
+      return;
+    }
+    if (!/^[+\d\s()-]{7,20}$/.test(phone)) {
+      setNotice({ type: "error", text: "Введіть коректний номер телефону" });
+      return;
+    }
+    setNotice(null);
     setLoading(true);
     const lead = {
       name,
@@ -50,7 +57,7 @@ export function ContactForm() {
 
     window.setTimeout(() => {
       setLoading(false);
-      toast.success("Дякуємо! Менеджер зв'яжеться з вами найближчим часом.");
+      setNotice({ type: "success", text: "Дякуємо! Менеджер зв'яжеться з вами найближчим часом." });
       form.reset();
     }, 700);
   }
@@ -109,6 +116,15 @@ export function ContactForm() {
       >
         {loading ? "Надсилаємо…" : "Записатись на огляд"}
       </button>
+      {notice && (
+        <p
+          role="status"
+          aria-live="polite"
+          className={`rounded-xl px-4 py-3 text-sm ${notice.type === "success" ? "bg-primary-soft text-forest" : "bg-red-50 text-red-700"}`}
+        >
+          {notice.text}
+        </p>
+      )}
       <p className="text-xs text-muted-foreground">
         Натискаючи кнопку, ви погоджуєтесь з обробкою персональних даних.
       </p>

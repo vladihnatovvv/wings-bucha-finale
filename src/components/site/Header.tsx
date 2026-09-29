@@ -2,9 +2,11 @@ import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { Phone, Menu, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import logo from "@/assets/logo-wings.png";
 import { DEFAULT_CONTACTS, readSiteContacts } from "@/lib/admin-store";
 import { readSiteContactsFn } from "@/lib/content.functions";
+import { siteAsset } from "@/lib/assets";
+
+const logo = siteAsset("images/logo-wings.webp");
 
 const nav = [
   { to: "#houses", label: "Будинки" },

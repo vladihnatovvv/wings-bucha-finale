@@ -12,4 +12,10 @@ export default defineConfig({
   tanstackStart: {
     server: { entry: "server" },
   },
+  vite: {
+    build: {
+      target: "es2022",
+      modulePreload: { polyfill: false },
+    },
+  },
 });

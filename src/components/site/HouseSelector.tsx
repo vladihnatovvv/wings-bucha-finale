@@ -262,6 +262,10 @@ export function HouseSelector() {
                             <img
                               src={h.img}
                               alt={h.name}
+                              width={320}
+                              height={240}
+                              loading="lazy"
+                              decoding="async"
                               className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
                             />
                             {isActive && (
@@ -347,8 +351,12 @@ export function HouseSelector() {
                         >
                           <motion.img
                             key={active.img}
-                            src={active.img}
+                            src={active.facade}
                             alt={active.name}
+                            width={960}
+                            height={720}
+                            loading="lazy"
+                            decoding="async"
                             initial={{ scale: 1.18, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}

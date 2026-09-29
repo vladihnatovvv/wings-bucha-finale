@@ -1,8 +1,10 @@
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
-import logo from "@/assets/logo-wings.png";
 import { DEFAULT_CONTACTS, readSiteContacts } from "@/lib/admin-store";
 import { readSiteContactsFn } from "@/lib/content.functions";
+import { siteAsset } from "@/lib/assets";
+
+const logo = siteAsset("images/logo-wings.webp");
 
 export function Footer() {
   const readSiteContactsServer = useServerFn(readSiteContactsFn);

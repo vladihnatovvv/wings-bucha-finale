@@ -1,7 +1,13 @@
-import duplex from "@/assets/type-duplex.jpg";
-import townhouse from "@/assets/type-townhouse.jpg";
-import cottage from "@/assets/type-cottage.jpg";
-import hero from "@/assets/hero-house.jpg";
+import { siteAsset } from "@/lib/assets";
+
+const duplex = siteAsset("images/type-duplex-640.webp");
+const duplexLarge = siteAsset("images/type-duplex-960.webp");
+const townhouse = siteAsset("images/type-townhouse-640.webp");
+const townhouseLarge = siteAsset("images/type-townhouse-960.webp");
+const cottage = siteAsset("images/type-cottage-640.webp");
+const cottageLarge = siteAsset("images/type-cottage-960.webp");
+const hero = siteAsset("images/hero-house-640.webp");
+const heroLarge = siteAsset("images/hero-house-1120.webp");
 
 export type UnitStatus = "available" | "reserved" | "sold";
 
@@ -112,7 +118,7 @@ export const DEFAULT_HOUSES: House[] = [
     name: "Дуплекс «Сосна»",
     type: "duplex",
     img: duplex,
-    facade: duplex,
+    facade: duplexLarge,
     area: 128,
     beds: 3,
     baths: 2,
@@ -147,7 +153,7 @@ export const DEFAULT_HOUSES: House[] = [
     name: "Таунхаус «Криве»",
     type: "townhouse",
     img: townhouse,
-    facade: townhouse,
+    facade: townhouseLarge,
     area: 96,
     beds: 2,
     baths: 2,
@@ -170,7 +176,7 @@ export const DEFAULT_HOUSES: House[] = [
     name: "Котедж «Політ»",
     type: "cottage",
     img: cottage,
-    facade: cottage,
+    facade: cottageLarge,
     area: 165,
     beds: 4,
     baths: 3,
@@ -205,7 +211,7 @@ export const DEFAULT_HOUSES: House[] = [
     name: "Дуплекс «Криничний»",
     type: "duplex",
     img: hero,
-    facade: hero,
+    facade: heroLarge,
     area: 142,
     beds: 3,
     baths: 2,
@@ -240,7 +246,7 @@ export const DEFAULT_HOUSES: House[] = [
     name: "Таунхаус «Паркова»",
     type: "townhouse",
     img: townhouse,
-    facade: townhouse,
+    facade: townhouseLarge,
     area: 108,
     beds: 3,
     baths: 2,
@@ -276,7 +282,7 @@ export const DEFAULT_HOUSES: House[] = [
     name: "Котедж «Лісовий»",
     type: "cottage",
     img: cottage,
-    facade: cottage,
+    facade: cottageLarge,
     area: 198,
     beds: 5,
     baths: 3,
