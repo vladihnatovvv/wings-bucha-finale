@@ -62,6 +62,8 @@ const LazyToaster = lazy(() =>
   import("@/components/ui/sonner").then(({ Toaster }) => ({ default: Toaster })),
 );
 
+const HOME_CANONICAL_URL = "https://wingsbucha.com/";
+
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
@@ -76,8 +78,10 @@ export const Route = createFileRoute("/")({
         property: "og:description",
         content: "Дім серед сосен у Бучі. Еко-простір, преміальна архітектура, єОселя.",
       },
+      { property: "og:url", content: HOME_CANONICAL_URL },
       { property: "og:type", content: "website" },
     ],
+    links: [{ rel: "canonical", href: HOME_CANONICAL_URL }],
   }),
   component: Index,
 });
