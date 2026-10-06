@@ -338,6 +338,7 @@ function HousesAdmin({ onNotice }: { onNotice: (message: string) => void }) {
   const deleteHouseServer = useServerFn(deleteHouseFn);
   const saveHouseTypeServer = useServerFn(saveHouseTypeFn);
   const uploadAdminImageServer = useServerFn(uploadAdminImageFn);
+  const uploadAdminFileServer = useServerFn(uploadAdminFileFn);
   const [houses, setHouses] = useState<House[]>(() => getHouses());
   const [houseTypes, setHouseTypes] = useState<HouseType[]>(() => readHouseTypes());
   const [newTypeLabel, setNewTypeLabel] = useState("");
@@ -392,6 +393,7 @@ function HousesAdmin({ onNotice }: { onNotice: (message: string) => void }) {
           type: draft.type,
           img: draft.img,
           facade: draft.facade,
+          videoUrl: draft.videoUrl,
           area: draft.area,
           beds: draft.beds,
           baths: draft.baths,
@@ -502,6 +504,23 @@ function HousesAdmin({ onNotice }: { onNotice: (message: string) => void }) {
       onNotice("Фото додано. Натисніть зберегти, щоб закріпити зміни.");
     } catch {
       onNotice("Не вдалося прочитати фото. Спробуйте інший файл.");
+    }
+  }
+
+  async function uploadHouseVideo(file: File) {
+    if (!draft) return;
+    if (!file.type.startsWith("video/")) {
+      onNotice("Оберіть відеофайл.");
+      return;
+    }
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const uploaded = await uploadAdminFileServer({ data: formData });
+      setDraft((current) => (current ? { ...current, videoUrl: uploaded.url } : current));
+      onNotice("Відео додано. Натисніть зберегти, щоб закріпити зміни.");
+    } catch {
+      onNotice("Не вдалося завантажити відео. Можна вставити URL вручну.");
     }
   }
 
@@ -698,6 +717,14 @@ function HousesAdmin({ onNotice }: { onNotice: (message: string) => void }) {
             onChange={(value) => setDraft({ ...draft, facade: value })}
             onFile={(file) => uploadImage(file, "facade")}
             className="md:col-span-2"
+          />
+          <FileUploadField
+            label="Відео об'єкта"
+            value={draft.videoUrl}
+            accept="video/mp4,video/webm,video/quicktime"
+            onChange={(value) => setDraft({ ...draft, videoUrl: value })}
+            onFile={uploadHouseVideo}
+            className="md:col-span-2 xl:col-span-4"
           />
           <label className="grid gap-1.5">
             <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">

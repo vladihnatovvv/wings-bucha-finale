@@ -52,6 +52,7 @@ function toHouse(row: DbHouse): House {
     type: row.type,
     img: row.img,
     facade: row.facade,
+    videoUrl: row.videoUrl,
     area: row.area,
     beds: row.beds,
     baths: row.baths,
@@ -140,30 +141,29 @@ async function ensureDefaults() {
     ),
   );
 
-  const housesCount = await prisma.house.count();
-  if (housesCount === 0) {
-    await prisma.house.createMany({
-      data: DEFAULT_HOUSES.map((house) => ({
-        id: house.id,
-        name: house.name,
-        type: house.type,
-        img: house.img,
-        facade: house.facade,
-        area: house.area,
-        beds: house.beds,
-        baths: house.baths,
-        floors: house.floors,
-        plot: house.plot,
-        priceUsd: house.priceUsd,
-        priceUah: house.priceUah,
-        priceCurrency: house.priceCurrency ?? "USD",
-        available: house.available,
-        features: house.features,
-        floorPlans: house.floorPlans,
-        unitPlans: house.unitPlans,
-      })),
-    });
-  }
+  await prisma.house.createMany({
+    data: DEFAULT_HOUSES.map((house) => ({
+      id: house.id,
+      name: house.name,
+      type: house.type,
+      img: house.img,
+      facade: house.facade,
+      videoUrl: house.videoUrl,
+      area: house.area,
+      beds: house.beds,
+      baths: house.baths,
+      floors: house.floors,
+      plot: house.plot,
+      priceUsd: house.priceUsd,
+      priceUah: house.priceUah,
+      priceCurrency: house.priceCurrency ?? "USD",
+      available: house.available,
+      features: house.features,
+      floorPlans: house.floorPlans,
+      unitPlans: house.unitPlans,
+    })),
+    skipDuplicates: true,
+  });
 
   await prisma.siteContacts.upsert({
     where: { id: 1 },
@@ -216,6 +216,7 @@ export async function saveHouse(house: House): Promise<House> {
       type: house.type,
       img: house.img,
       facade: house.facade,
+      videoUrl: house.videoUrl,
       area: house.area,
       beds: house.beds,
       baths: house.baths,
@@ -235,6 +236,7 @@ export async function saveHouse(house: House): Promise<House> {
       type: house.type,
       img: house.img,
       facade: house.facade,
+      videoUrl: house.videoUrl,
       area: house.area,
       beds: house.beds,
       baths: house.baths,

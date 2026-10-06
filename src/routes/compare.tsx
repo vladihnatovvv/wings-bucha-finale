@@ -144,7 +144,15 @@ function ComparePage() {
                     className="relative overflow-hidden rounded-2xl border border-border bg-card"
                   >
                     <div className="aspect-[4/3] overflow-hidden">
-                      <img src={h.img} alt={h.name} width={640} height={480} loading="lazy" decoding="async" className="h-full w-full object-cover" />
+                      <img
+                        src={h.img}
+                        alt={h.name}
+                        width={640}
+                        height={480}
+                        loading="lazy"
+                        decoding="async"
+                        className="h-full w-full object-cover"
+                      />
                     </div>
                     <div className="p-4">
                       <div className="text-sm font-bold">{h.name}</div>

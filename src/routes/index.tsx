@@ -569,6 +569,30 @@ function About() {
 /* ───────── HOUSES ───────── */
 const houseTypes = [
   {
+    id: "cityhouse",
+    img: townhouse,
+    name: "Сітіхаус",
+    area: "від 82 м²",
+    beds: "2 спальні",
+    price: "від $98 000",
+  },
+  {
+    id: "townhouse-one-floor",
+    img: townhouse,
+    name: "Таунхаус одноповерховий",
+    area: "108 м²",
+    beds: "3 спальні",
+    price: "від $124 000",
+  },
+  {
+    id: "townhouse-two-floor",
+    img: townhouse,
+    name: "Таунхаус двоповерховий",
+    area: "96 м²",
+    beds: "2 спальні",
+    price: "від $112 000",
+  },
+  {
     id: "duplex",
     img: duplex,
     name: "Дуплекс",
@@ -577,17 +601,9 @@ const houseTypes = [
     price: "від $145 000",
   },
   {
-    id: "townhouse",
-    img: townhouse,
-    name: "Таунхаус",
-    area: "96 м²",
-    beds: "2 спальні",
-    price: "від $112 000",
-  },
-  {
-    id: "cottage",
+    id: "house",
     img: cottage,
-    name: "Котедж",
+    name: "Будинок",
     area: "165 м²",
     beds: "4 спальні",
     price: "від $189 000",
@@ -606,13 +622,13 @@ function Houses() {
             <Eyebrow>Обрати дім</Eyebrow>
             <h2 className="mt-3 text-4xl font-bold tracking-tight md:text-6xl">Типи будинків</h2>
             <p className="mt-4 max-w-xl text-muted-foreground">
-              Шість форматів житла — від компактних таунхаусів до просторих котеджів серед сосен.
+              П'ять форматів житла — від компактних сітіхаусів до просторих будинків серед сосен.
             </p>
           </Reveal>
           <Reveal delay={0.2}>
             <div className="flex gap-2 text-xs uppercase tracking-wider text-muted-foreground">
               <Tag>
-                <HomeIcon className="h-3.5 w-3.5" /> Котеджі
+                <HomeIcon className="h-3.5 w-3.5" /> Будинки
               </Tag>
               <Tag>
                 <Building2 className="h-3.5 w-3.5" /> Таунхауси
@@ -621,7 +637,7 @@ function Houses() {
           </Reveal>
         </div>
 
-        <div className="mt-14 grid gap-6 md:grid-cols-3">
+        <div className="mt-14 grid gap-6 md:grid-cols-2 xl:grid-cols-5">
           {houseTypes.map((h, i) => (
             <Reveal key={h.id} delay={i * 0.12} y={40}>
               <motion.article

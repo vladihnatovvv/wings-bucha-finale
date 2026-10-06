@@ -23,6 +23,7 @@ model House {
   type          String
   img           String   @db.Text
   facade        String   @db.Text
+  videoUrl      String   @default("") @map("video_url") @db.Text
   area          Float
   beds          Int
   baths         Int

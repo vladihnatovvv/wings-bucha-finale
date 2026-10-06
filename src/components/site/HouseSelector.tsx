@@ -38,7 +38,7 @@ import { listHousesFn, listHouseTypesFn } from "@/lib/content.functions";
 
 function iconForType(type: string) {
   if (type === "duplex") return HomeIcon;
-  if (type === "cottage") return Trees;
+  if (type === "cottage" || type === "house") return Trees;
   return Building2;
 }
 
@@ -349,19 +349,35 @@ export function HouseSelector() {
                           params={{ id: active.id }}
                           className="group/img relative block aspect-[16/11] cursor-pointer overflow-hidden"
                         >
-                          <motion.img
-                            key={active.img}
-                            src={active.facade}
-                            alt={active.name}
-                            width={960}
-                            height={720}
-                            loading="lazy"
-                            decoding="async"
-                            initial={{ scale: 1.18, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
-                            className="h-full w-full object-cover transition-transform duration-700 group-hover/img:scale-105"
-                          />
+                          {active.videoUrl ? (
+                            <motion.video
+                              key={active.videoUrl}
+                              src={active.videoUrl}
+                              poster={active.facade}
+                              muted
+                              loop
+                              playsInline
+                              autoPlay
+                              initial={{ scale: 1.08, opacity: 0 }}
+                              animate={{ scale: 1, opacity: 1 }}
+                              transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
+                              className="h-full w-full object-cover transition-transform duration-700 group-hover/img:scale-105"
+                            />
+                          ) : (
+                            <motion.img
+                              key={active.facade}
+                              src={active.facade}
+                              alt={active.name}
+                              width={960}
+                              height={720}
+                              loading="lazy"
+                              decoding="async"
+                              initial={{ scale: 1.18, opacity: 0 }}
+                              animate={{ scale: 1, opacity: 1 }}
+                              transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
+                              className="h-full w-full object-cover transition-transform duration-700 group-hover/img:scale-105"
+                            />
+                          )}
                           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
 
                           {/* Floating badge */}

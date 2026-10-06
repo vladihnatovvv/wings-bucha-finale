@@ -12,6 +12,7 @@ import {
   Layers,
   LayoutGrid,
   Scale,
+  Video,
 } from "lucide-react";
 import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
@@ -78,7 +79,7 @@ export const Route = createFileRoute("/house/$id")({
   ),
 });
 
-type Tab = "facade" | "floor" | "unit";
+type Tab = "facade" | "video" | "floor" | "unit";
 
 function HousePage() {
   const getHouseByIdServer = useServerFn(getHouseByIdFn);
@@ -250,6 +251,15 @@ function HousePage() {
             >
               Фасад
             </TabBtn>
+            {house.videoUrl && (
+              <TabBtn
+                active={tab === "video"}
+                onClick={() => setTab("video")}
+                icon={<Video className="h-4 w-4" />}
+              >
+                Відео
+              </TabBtn>
+            )}
             <TabBtn
               active={tab === "floor"}
               onClick={() => setTab("floor")}
@@ -275,6 +285,20 @@ function HousePage() {
                     src={house.facade}
                     alt={house.name}
                     initial={{ opacity: 0, scale: 1.04 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.4 }}
+                    className="absolute inset-0 h-full w-full object-cover"
+                  />
+                )}
+                {tab === "video" && house.videoUrl && (
+                  <motion.video
+                    key="video"
+                    src={house.videoUrl}
+                    poster={house.facade || house.img}
+                    controls
+                    playsInline
+                    initial={{ opacity: 0, scale: 1.02 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.4 }}

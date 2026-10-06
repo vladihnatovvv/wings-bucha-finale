@@ -25,6 +25,7 @@ export type House = {
   type: string;
   img: string;
   facade: string;
+  videoUrl: string;
   area: number;
   beds: number;
   baths: number;
@@ -48,9 +49,19 @@ export type HouseType = {
 };
 
 export const DEFAULT_HOUSE_TYPES: HouseType[] = [
+  { id: "cityhouse", label: "Сітіхаус", pluralLabel: "Сітіхауси" },
+  {
+    id: "townhouse-one-floor",
+    label: "Таунхаус одноповерховий",
+    pluralLabel: "Таунхауси одноповерхові",
+  },
+  {
+    id: "townhouse-two-floor",
+    label: "Таунхаус двоповерховий",
+    pluralLabel: "Таунхауси двоповерхові",
+  },
   { id: "duplex", label: "Дуплекс", pluralLabel: "Дуплекси" },
-  { id: "townhouse", label: "Таунхаус", pluralLabel: "Таунхауси" },
-  { id: "cottage", label: "Котедж", pluralLabel: "Котеджі" },
+  { id: "house", label: "Будинок", pluralLabel: "Будинки" },
 ];
 
 const CUSTOM_HOUSES_STORAGE_KEY = "wb_custom_houses";
@@ -119,6 +130,7 @@ export const DEFAULT_HOUSES: House[] = [
     type: "duplex",
     img: duplex,
     facade: duplexLarge,
+    videoUrl: "",
     area: 128,
     beds: 3,
     baths: 2,
@@ -150,10 +162,11 @@ export const DEFAULT_HOUSES: House[] = [
   },
   {
     id: "townhouse",
-    name: "Таунхаус «Криве»",
-    type: "townhouse",
+    name: "Таунхаус двоповерховий «Криве»",
+    type: "townhouse-two-floor",
     img: townhouse,
     facade: townhouseLarge,
+    videoUrl: "",
     area: 96,
     beds: 2,
     baths: 2,
@@ -173,10 +186,11 @@ export const DEFAULT_HOUSES: House[] = [
   },
   {
     id: "cottage",
-    name: "Котедж «Політ»",
-    type: "cottage",
+    name: "Будинок «Політ»",
+    type: "house",
     img: cottage,
     facade: cottageLarge,
+    videoUrl: "",
     area: 165,
     beds: 4,
     baths: 3,
@@ -212,6 +226,7 @@ export const DEFAULT_HOUSES: House[] = [
     type: "duplex",
     img: hero,
     facade: heroLarge,
+    videoUrl: "",
     area: 142,
     beds: 3,
     baths: 2,
@@ -243,18 +258,19 @@ export const DEFAULT_HOUSES: House[] = [
   },
   {
     id: "townhouse-park",
-    name: "Таунхаус «Паркова»",
-    type: "townhouse",
+    name: "Таунхаус одноповерховий «Паркова»",
+    type: "townhouse-one-floor",
     img: townhouse,
     facade: townhouseLarge,
     area: 108,
     beds: 3,
     baths: 2,
-    floors: 3,
+    floors: 1,
     plot: 2,
     priceUsd: 124000,
     available: 9,
-    features: ["Дах-тераса", "Гараж", "Panoramic glazing", "Smart-Home Ready"],
+    videoUrl: "",
+    features: ["Приватний дворик", "Гараж", "Панорамне скління", "Smart-Home Ready"],
     floorPlans: [
       { label: "Цокольний", img: planFloor("Цоколь · 30 м²") },
       { label: "Перший поверх", img: planFloor("Перший поверх · 40 м²") },
@@ -279,10 +295,11 @@ export const DEFAULT_HOUSES: House[] = [
   },
   {
     id: "cottage-forest",
-    name: "Котедж «Лісовий»",
-    type: "cottage",
+    name: "Будинок «Лісовий»",
+    type: "house",
     img: cottage,
     facade: cottageLarge,
+    videoUrl: "",
     area: 198,
     beds: 5,
     baths: 3,
@@ -306,6 +323,42 @@ export const DEFAULT_HOUSES: House[] = [
       { label: "Преміум", area: 220, rooms: 7, img: planUnit("Преміум · 220 м²"), status: "sold" },
     ],
   },
+  {
+    id: "cityhouse-forest",
+    name: "Сітіхаус «Лісова 26»",
+    type: "cityhouse",
+    img: townhouse,
+    facade: townhouseLarge,
+    videoUrl: "",
+    area: 82,
+    beds: 2,
+    baths: 2,
+    floors: 2,
+    plot: 1,
+    priceUsd: 98000,
+    available: 7,
+    features: ["Компактний формат", "Власний вхід", "Паркомісце", "Тераса"],
+    floorPlans: [
+      { label: "Перший поверх", img: planFloor("Перший поверх · 41 м²") },
+      { label: "Другий поверх", img: planFloor("Другий поверх · 41 м²") },
+    ],
+    unitPlans: [
+      {
+        label: "Сітіхаус A",
+        area: 82,
+        rooms: 3,
+        img: planUnit("Сітіхаус A · 82 м²"),
+        status: "available",
+      },
+      {
+        label: "Сітіхаус B",
+        area: 88,
+        rooms: 3,
+        img: planUnit("Сітіхаус B · 88 м²"),
+        status: "reserved",
+      },
+    ],
+  },
 ];
 
 type HouseEditableFields = Pick<
@@ -314,6 +367,7 @@ type HouseEditableFields = Pick<
   | "type"
   | "img"
   | "facade"
+  | "videoUrl"
   | "area"
   | "beds"
   | "baths"
@@ -400,8 +454,10 @@ function uniqueId(base: string, existing: string[]) {
 }
 
 function imageForType(type: string) {
-  if (type === "townhouse") return townhouse;
-  if (type === "cottage") return cottage;
+  if (type === "townhouse" || type === "townhouse-one-floor" || type === "townhouse-two-floor") {
+    return townhouse;
+  }
+  if (type === "cottage" || type === "house") return cottage;
   if (type === "duplex") return duplex;
   return hero;
 }
@@ -527,6 +583,7 @@ export function createHouse(type = "duplex"): House {
     type,
     img,
     facade: img,
+    videoUrl: "",
     area: 100,
     beds: 3,
     baths: 2,
