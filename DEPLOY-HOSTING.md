@@ -49,7 +49,7 @@ PUBLIC_UPLOAD_BASE_URL="/uploads"
 
 ## Запуск як сервіс
 
-У папці [deploy/wings-bucha.service](/Users/ihnatovvladgmail.com/Downloads/wings-bucha/deploy/wings-bucha.service) є готовий `systemd` unit.
+У файлі `deploy/wings-bucha.service` є готовий `systemd` unit.
 
 Що треба зробити адміну:
 
@@ -66,7 +66,7 @@ sudo systemctl status wings-bucha
 
 ## Nginx
 
-У папці [deploy/nginx.conf](/Users/ihnatovvladgmail.com/Downloads/wings-bucha/deploy/nginx.conf) є базовий reverse-proxy конфіг.
+У файлі `deploy/nginx.conf` є базовий reverse-proxy конфіг.
 
 Що треба змінити:
 
@@ -78,6 +78,6 @@ sudo systemctl status wings-bucha
 ## Важливо
 
 - Перед запуском у продакшні треба обов'язково виконати `npm run build`
-- Серверний запуск іде через [deploy/node-server.mjs](/Users/ihnatovvladgmail.com/Downloads/wings-bucha/deploy/node-server.mjs)
+- Серверний запуск іде через `deploy/node-server.mjs`
 - Цей раннер сам віддає `dist/client` як статику і SSR-сторінки через `dist/server/server.js`
 - Для продакшену обов'язково потрібні `DATABASE_URL`, `ADMIN_PASSWORD` і `ADMIN_SESSION_SECRET`

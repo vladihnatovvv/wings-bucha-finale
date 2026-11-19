@@ -532,6 +532,7 @@ function HousesAdmin({ onNotice }: { onNotice: (message: string) => void }) {
   }
 
   function changePrice(value: number) {
+    if (!draft) return;
     const currency = draft.priceCurrency ?? "USD";
     if (currency === "UAH") {
       setDraft({

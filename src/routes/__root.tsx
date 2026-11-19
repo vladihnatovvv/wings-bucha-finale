@@ -13,7 +13,22 @@ import appCss from "../styles.css?url";
 const META_PIXEL_ID = "1058761913721264";
 const TIKTOK_PIXEL_ID = "DAF8JE3C77UDHLL3L250";
 
-const metaPixelScript = `
+const deferUntilIdle = (script: string) => `
+(() => {
+  const load = () => { ${script} };
+  const schedule = () => {
+    if ('requestIdleCallback' in window) {
+      window.requestIdleCallback(load, { timeout: 3000 });
+    } else {
+      window.setTimeout(load, 1500);
+    }
+  };
+  if (document.readyState === 'complete') schedule();
+  else window.addEventListener('load', schedule, { once: true });
+})();
+`;
+
+const metaPixelScript = deferUntilIdle(`
 !function(f,b,e,v,n,t,s)
 {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
 n.callMethod.apply(n,arguments):n.queue.push(arguments)};
@@ -24,9 +39,9 @@ s.parentNode.insertBefore(t,s)}(window, document,'script',
 'https://connect.facebook.net/en_US/fbevents.js');
 fbq('init', '${META_PIXEL_ID}');
 fbq('track', 'PageView');
-`;
+`);
 
-const tikTokPixelScript = `
+const tikTokPixelScript = deferUntilIdle(`
 !function (w, d, t) {
   w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie","holdConsent","revokeConsent","grantConsent"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};
   for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);
@@ -38,7 +53,7 @@ const tikTokPixelScript = `
   ttq.load('${TIKTOK_PIXEL_ID}');
   ttq.page();
 }(window, document, 'ttq');
-`;
+`);
 
 function NotFoundComponent() {
   return (
