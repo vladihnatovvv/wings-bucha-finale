@@ -6,8 +6,18 @@ const townhouse = siteAsset("images/type-townhouse-640.webp");
 const townhouseLarge = siteAsset("images/type-townhouse-960.webp");
 const cottage = siteAsset("images/type-cottage-640.webp");
 const cottageLarge = siteAsset("images/type-cottage-960.webp");
+const townhouseOne = siteAsset("images/type-townhouse-one-640.webp");
+const townhouseOneLarge = siteAsset("images/type-townhouse-one-960.webp");
+const cityhouse = siteAsset("images/type-cityhouse-640.webp");
+const cityhouseLarge = siteAsset("images/type-cityhouse-960.webp");
 const hero = siteAsset("images/hero-house-640.webp");
 const heroLarge = siteAsset("images/hero-house-1120.webp");
+
+const duplexVideo = siteAsset("videos/type-duplex.mp4");
+const townhouseVideo = siteAsset("videos/type-townhouse-two.mp4");
+const townhouseOneVideo = siteAsset("videos/type-townhouse-one.mp4");
+const cottageVideo = siteAsset("videos/type-house.mp4");
+const cityhouseVideo = siteAsset("videos/type-cityhouse.mp4");
 
 export type UnitStatus = "available" | "reserved" | "sold";
 
@@ -130,7 +140,7 @@ export const DEFAULT_HOUSES: House[] = [
     type: "duplex",
     img: duplex,
     facade: duplexLarge,
-    videoUrl: "",
+    videoUrl: duplexVideo,
     area: 128,
     beds: 3,
     baths: 2,
@@ -166,7 +176,7 @@ export const DEFAULT_HOUSES: House[] = [
     type: "townhouse-two-floor",
     img: townhouse,
     facade: townhouseLarge,
-    videoUrl: "",
+    videoUrl: townhouseVideo,
     area: 96,
     beds: 2,
     baths: 2,
@@ -190,7 +200,7 @@ export const DEFAULT_HOUSES: House[] = [
     type: "house",
     img: cottage,
     facade: cottageLarge,
-    videoUrl: "",
+    videoUrl: cottageVideo,
     area: 165,
     beds: 4,
     baths: 3,
@@ -224,9 +234,9 @@ export const DEFAULT_HOUSES: House[] = [
     id: "duplex-pine",
     name: "Дуплекс «Криничний»",
     type: "duplex",
-    img: hero,
-    facade: heroLarge,
-    videoUrl: "",
+    img: duplex,
+    facade: duplexLarge,
+    videoUrl: duplexVideo,
     area: 142,
     beds: 3,
     baths: 2,
@@ -260,8 +270,8 @@ export const DEFAULT_HOUSES: House[] = [
     id: "townhouse-park",
     name: "Таунхаус одноповерховий «Паркова»",
     type: "townhouse-one-floor",
-    img: townhouse,
-    facade: townhouseLarge,
+    img: townhouseOne,
+    facade: townhouseOneLarge,
     area: 108,
     beds: 3,
     baths: 2,
@@ -269,7 +279,7 @@ export const DEFAULT_HOUSES: House[] = [
     plot: 2,
     priceUsd: 124000,
     available: 9,
-    videoUrl: "",
+    videoUrl: townhouseOneVideo,
     features: ["Приватний дворик", "Гараж", "Панорамне скління", "Smart-Home Ready"],
     floorPlans: [
       { label: "Цокольний", img: planFloor("Цоколь · 30 м²") },
@@ -299,7 +309,7 @@ export const DEFAULT_HOUSES: House[] = [
     type: "house",
     img: cottage,
     facade: cottageLarge,
-    videoUrl: "",
+    videoUrl: cottageVideo,
     area: 198,
     beds: 5,
     baths: 3,
@@ -327,9 +337,9 @@ export const DEFAULT_HOUSES: House[] = [
     id: "cityhouse-forest",
     name: "Сітіхаус «Лісова 26»",
     type: "cityhouse",
-    img: townhouse,
-    facade: townhouseLarge,
-    videoUrl: "",
+    img: cityhouse,
+    facade: cityhouseLarge,
+    videoUrl: cityhouseVideo,
     area: 82,
     beds: 2,
     baths: 2,
@@ -453,13 +463,40 @@ function uniqueId(base: string, existing: string[]) {
   return candidate;
 }
 
-function imageForType(type: string) {
-  if (type === "townhouse" || type === "townhouse-one-floor" || type === "townhouse-two-floor") {
-    return townhouse;
-  }
+export function imageForType(type: string) {
+  if (type === "cityhouse") return cityhouse;
+  if (type === "townhouse-one-floor") return townhouseOne;
+  if (type === "townhouse-two-floor" || type === "townhouse") return townhouse;
   if (type === "cottage" || type === "house") return cottage;
   if (type === "duplex") return duplex;
   return hero;
+}
+
+export function facadeForType(type: string) {
+  if (type === "cityhouse") return cityhouseLarge;
+  if (type === "townhouse-one-floor") return townhouseOneLarge;
+  if (type === "townhouse-two-floor" || type === "townhouse") return townhouseLarge;
+  if (type === "cottage" || type === "house") return cottageLarge;
+  if (type === "duplex") return duplexLarge;
+  return heroLarge;
+}
+
+export function videoForType(type: string) {
+  if (type === "cityhouse") return cityhouseVideo;
+  if (type === "townhouse-one-floor") return townhouseOneVideo;
+  if (type === "townhouse-two-floor" || type === "townhouse") return townhouseVideo;
+  if (type === "cottage" || type === "house") return cottageVideo;
+  if (type === "duplex") return duplexVideo;
+  return "";
+}
+
+const PLACEHOLDER_IMAGE_RE =
+  /^\/images\/(type-(duplex|townhouse|townhouse-one|cottage|cityhouse)|hero-house)-\d+\.webp$/;
+
+export function isPlaceholderImage(value: string) {
+  if (!value) return true;
+  const path = value.replace(/^https?:\/\/[^/]+/, "").replace(/^\/+/, "");
+  return PLACEHOLDER_IMAGE_RE.test(`/${path}`);
 }
 
 export function readHouseTypes(): HouseType[] {
@@ -582,8 +619,8 @@ export function createHouse(type = "duplex"): House {
     name: `${typeLabel} «Новий»`,
     type,
     img,
-    facade: img,
-    videoUrl: "",
+    facade: imageForType(type),
+    videoUrl: videoForType(type),
     area: 100,
     beds: 3,
     baths: 2,

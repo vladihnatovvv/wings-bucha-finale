@@ -39,7 +39,7 @@ export function Footer() {
               </div>
             </div>
             <p className="mt-5 max-w-md text-sm leading-relaxed text-muted-foreground">
-              Сучасний житловий комплекс серед лісу, у 15 хвилинах від Києва. Дім, де народжуються
+              Сучасне котеджне містечко серед лісу, у 15 хвилинах від Києва. Дім, де народжуються
               крила.
             </p>
           </div>
@@ -65,7 +65,6 @@ export function Footer() {
             <h4 className="text-sm font-semibold">Забудовник</h4>
             <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
               <li>ТОВ «Крила Бучі Девелопмент»</li>
-              <li>ЄДРПОУ: 44851237</li>
             </ul>
           </div>
         </div>

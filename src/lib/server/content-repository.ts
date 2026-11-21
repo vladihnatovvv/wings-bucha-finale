@@ -19,7 +19,16 @@ import {
   type SiteDocument,
   type SiteSettings,
 } from "@/lib/admin-store";
-import { DEFAULT_HOUSE_TYPES, DEFAULT_HOUSES, type House, type HouseType } from "@/lib/houses";
+import {
+  DEFAULT_HOUSE_TYPES,
+  DEFAULT_HOUSES,
+  facadeForType,
+  imageForType,
+  isPlaceholderImage,
+  videoForType,
+  type House,
+  type HouseType,
+} from "@/lib/houses";
 import { hasDatabaseUrl, prisma } from "./db";
 
 function requireDb() {
@@ -50,9 +59,9 @@ function toHouse(row: DbHouse): House {
     id: row.id,
     name: row.name,
     type: row.type,
-    img: row.img,
-    facade: row.facade,
-    videoUrl: row.videoUrl,
+    img: isPlaceholderImage(row.img) ? imageForType(row.type) : row.img,
+    facade: isPlaceholderImage(row.facade) ? facadeForType(row.type) : row.facade,
+    videoUrl: row.videoUrl || videoForType(row.type),
     area: row.area,
     beds: row.beds,
     baths: row.baths,
@@ -110,13 +119,17 @@ function toSiteDocument(row: DbSiteDocument): SiteDocument {
   };
 }
 
+const constructionImageFallback = new Map(
+  DEFAULT_CONSTRUCTION_UPDATES.map((item) => [item.id, item.image]),
+);
+
 function toConstructionUpdate(row: DbConstructionUpdate): ConstructionUpdate {
   return {
     id: row.id,
     date: row.date.toISOString().slice(0, 10),
     title: row.title,
     description: row.description,
-    image: row.image,
+    image: row.image || constructionImageFallback.get(row.id) || "",
     progress: row.progress,
     sortOrder: row.sortOrder,
   };

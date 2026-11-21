@@ -57,22 +57,34 @@ const LazyCurrencyCalculator = lazy(() =>
 const heroHouse = siteAsset("images/hero-house-640.webp");
 const heroHouseMedium = siteAsset("images/hero-house-800.webp");
 const heroHouseLarge = siteAsset("images/hero-house-1120.webp");
+const heroPoster = siteAsset("images/hero-poster-1280.webp");
 const duplex = siteAsset("images/type-duplex-640.webp");
 const townhouse = siteAsset("images/type-townhouse-640.webp");
+const townhouseOne = siteAsset("images/type-townhouse-one-640.webp");
+const cityhouse = siteAsset("images/type-cityhouse-640.webp");
 const cottage = siteAsset("images/type-cottage-640.webp");
 const masterplan = siteAsset("images/masterplan-800.webp");
 const masterplanLarge = siteAsset("images/masterplan-1200.webp");
+const aboutWide = siteAsset("images/about-wide-800.webp");
+const aboutWideLarge = siteAsset("images/about-wide-1600.webp");
+const financingPhoto = siteAsset("images/financing-720.webp");
+const contactPhoto = siteAsset("images/contact-720.webp");
+const constructionFallback = new Map(
+  DEFAULT_CONSTRUCTION_UPDATES.map((item) => [item.id, item.image]),
+);
 
 const HOME_CANONICAL_URL = "https://wingsbucha.com/";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Wings Bucha — Крила Бучі | ЖК серед природи, єОселя, 15 хв до Києва" },
+      {
+        title: "Wings Bucha — Крила Бучі | Котеджне містечко серед природи, єОселя, 15 хв до Києва",
+      },
       {
         name: "description",
         content:
-          "Преміальний еко-ЖК Wings Bucha у Бучі: дуплекси, таунхауси, котеджі серед сосен. Кредит за єОселя, державні сертифікати, 15 хв до Києва.",
+          "Преміальне котеджне містечко Wings Bucha у Бучі: дуплекси, таунхауси, котеджі серед сосен. Кредит за єОселя, державні сертифікати, 15 хв до Києва.",
       },
       { property: "og:title", content: "Wings Bucha — там, де починається твій політ" },
       {
@@ -102,6 +114,7 @@ function Index() {
         <Hero />
         <ScrollVideo />
         <Marquee />
+        <About />
         <LazyOnView anchorId="houses" minHeight="70vh">
           <LazyHouseSelector />
         </LazyOnView>
@@ -197,7 +210,7 @@ function Hero() {
     <section ref={ref} className="relative isolate overflow-hidden bg-background text-foreground">
       {/* Top meta strip */}
       <div className="container-x relative z-10 flex items-center justify-between border-b border-border/60 py-5 text-[11px] uppercase tracking-[0.28em] text-muted-foreground">
-        <span>ЖК — Буча · Лісова 28</span>
+        <span>Котеджне містечко — Буча · Лісова 28</span>
         <span className="hidden items-center gap-2 md:inline-flex">
           <span className="relative inline-flex h-2 w-2">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/60" />
@@ -369,7 +382,7 @@ function ScrollVideo() {
   const width = useTransform(scrollYProgress, [0, 0.5], ["32%", "100%"]);
   const height = useTransform(scrollYProgress, [0, 0.5], ["38vh", "100vh"]);
   const radius = useTransform(scrollYProgress, [0, 0.5], [32, 0]);
-  const videoSrc = settings.scrollMediaVideoUrl.trim();
+  const videoSrc = settings.scrollMediaVideoUrl.trim() || DEFAULT_SITE_SETTINGS.scrollMediaVideoUrl;
 
   useEffect(() => {
     let alive = true;
@@ -411,7 +424,7 @@ function ScrollVideo() {
           {videoSrc ? (
             <video
               src={loadVideo ? videoSrc : undefined}
-              poster={loadVideo ? heroHouseMedium : undefined}
+              poster={loadVideo ? heroPoster : undefined}
               autoPlay
               muted
               loop
@@ -422,7 +435,7 @@ function ScrollVideo() {
           ) : (
             <motion.img
               src={heroHouse}
-              alt="Wings Bucha — відео-блок комплексу"
+              alt="Wings Bucha — відео-блок котеджного містечка"
               loading="lazy"
               className="absolute inset-0 h-full w-full object-cover"
             />
@@ -475,7 +488,7 @@ function Stat({ value, label, delay = 0 }: { value: string; label: string; delay
 /* ───────── MARQUEE ───────── */
 function Marquee() {
   const items = [
-    "Преміальний еко-ЖК",
+    "Преміальне котеджне містечко",
     "єОселя 3% / 7%",
     "Сосновий ліс",
     "15 хв до Києва",
@@ -527,7 +540,7 @@ function About() {
     <section id="about" className="container-x py-24 md:py-32">
       <div className="grid gap-12 md:grid-cols-[1fr_1.2fr] md:items-end">
         <Reveal>
-          <Eyebrow>Про комплекс</Eyebrow>
+          <Eyebrow>Про містечко</Eyebrow>
           <h2 className="mt-3 text-4xl font-bold tracking-tight md:text-6xl">
             Жити серед природи,
             <br />
@@ -541,6 +554,24 @@ function About() {
           </p>
         </Reveal>
       </div>
+
+      <Reveal delay={0.1}>
+        <Parallax offset={30}>
+          <div className="mt-12 overflow-hidden rounded-[2rem] shadow-card">
+            <img
+              src={aboutWide}
+              srcSet={`${aboutWide} 800w, ${aboutWideLarge} 1600w`}
+              sizes="(min-width: 768px) 90vw, 100vw"
+              alt="Wings Bucha — архітектура котеджного містечка"
+              width={1600}
+              height={600}
+              loading="lazy"
+              decoding="async"
+              className="h-full w-full object-cover"
+            />
+          </div>
+        </Parallax>
+      </Reveal>
 
       <div className="mt-16 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
         {items.map((it, i) => (
@@ -570,7 +601,7 @@ function About() {
 const houseTypes = [
   {
     id: "cityhouse",
-    img: townhouse,
+    img: cityhouse,
     name: "Сітіхаус",
     area: "від 82 м²",
     beds: "2 спальні",
@@ -578,7 +609,7 @@ const houseTypes = [
   },
   {
     id: "townhouse-one-floor",
-    img: townhouse,
+    img: townhouseOne,
     name: "Таунхаус одноповерховий",
     area: "108 м²",
     beds: "3 спальні",
@@ -735,18 +766,18 @@ function Financing() {
       tag: "Сертифікат",
       rate: "100%",
       title: "Житловий сертифікат",
-      text: "Приймаємо державні житлові сертифікати для ВПО та комбатантів (Постанова 1176).",
+      text: "Приймаємо державні житлові сертифікати, отримані за пошкоджене або знищене житло.",
     },
     {
       tag: "Ваучер",
       rate: "100%",
       title: "Житловий ваучер",
-      text: "Зараховуємо суму ваучера у вартість житла. Допомагаємо з оформленням та супроводом.",
+      text: "Зараховуємо суму ваучера за Постановою 1176 у вартість житла. Допомагаємо з оформленням та супроводом.",
     },
     {
-      tag: "Розстрочка",
+      tag: "Розтермінування",
       rate: "0%",
-      title: "Безвідсоткова розстрочка",
+      title: "Безвідсоткове розтермінування",
       text: "До 24 місяців без переплат від забудовника. Перший внесок від 30%.",
     },
   ];
@@ -773,6 +804,20 @@ function Financing() {
                 <Wallet className="mr-2 h-4 w-4" /> Розрахувати кредит
                 <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
               </a>
+
+              <Parallax offset={20}>
+                <div className="mt-8 overflow-hidden rounded-2xl shadow-soft">
+                  <img
+                    src={financingPhoto}
+                    alt="Таунхауси Wings Bucha"
+                    width={720}
+                    height={540}
+                    loading="lazy"
+                    decoding="async"
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+              </Parallax>
             </div>
 
             <div className="grid gap-4">
@@ -825,7 +870,7 @@ function Masterplan() {
               "Закрита територія з охороною",
               "Дитячі та спортивні майданчики",
               "Двори без авто",
-              "Підземний та гостьовий паркінг",
+              "Гостьовий паркінг",
             ].map((t, i) => (
               <Reveal key={t} delay={i * 0.08}>
                 <li className="flex items-center gap-3">
@@ -891,7 +936,7 @@ function ConstructionProgress() {
               <h2 className="mt-3 text-4xl font-bold tracking-tight md:text-6xl">
                 Роботи йдуть
                 <br />
-                <span className="text-shimmer">за графіком.</span>
+                <span className="text-shimmer">за графіком</span>
               </h2>
               <p className="mt-4 max-w-2xl text-muted-foreground">
                 Оновлення з майданчика: етапи, фото та поточна готовність першої черги.
@@ -917,27 +962,15 @@ function ConstructionProgress() {
             <Reveal key={item.id} delay={index * 0.1}>
               <article className="h-full overflow-hidden rounded-2xl border border-border bg-card shadow-card">
                 <div className="relative aspect-[4/3] bg-background">
-                  {item.image ? (
-                    <img
-                      src={item.image}
-                      alt={item.title}
-                      width={640}
-                      height={480}
-                      loading="lazy"
-                      decoding="async"
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <img
-                      src={heroHouse}
-                      alt={item.title}
-                      width={640}
-                      height={480}
-                      loading="lazy"
-                      decoding="async"
-                      className="h-full w-full object-cover opacity-80"
-                    />
-                  )}
+                  <img
+                    src={item.image || constructionFallback.get(item.id) || heroHouse}
+                    alt={item.title}
+                    width={640}
+                    height={480}
+                    loading="lazy"
+                    decoding="async"
+                    className="h-full w-full object-cover"
+                  />
                   <div className="absolute left-4 top-4 inline-flex items-center gap-2 rounded-full bg-background/90 px-3 py-1.5 text-xs font-semibold backdrop-blur">
                     <HardHat className="h-3.5 w-3.5 text-primary" />
                     {formatDate(item.date)}
@@ -1197,7 +1230,7 @@ function Contact() {
           </h2>
           <p className="mt-6 max-w-md text-base leading-relaxed text-primary-foreground/85">
             Залиште контакт — менеджер зателефонує впродовж 15 хвилин у робочий час, розрахує умови
-            та запросить на огляд комплексу.
+            та запросить на огляд котеджного містечка.
           </p>
           <div className="mt-9 space-y-3 text-sm">
             <div>
@@ -1213,6 +1246,18 @@ function Contact() {
               </a>
             </div>
             <div>📍 {contacts.address}</div>
+          </div>
+
+          <div className="mt-8 overflow-hidden rounded-[1.5rem] ring-1 ring-white/20">
+            <img
+              src={contactPhoto}
+              alt="Сітіхауси Wings Bucha"
+              width={720}
+              height={540}
+              loading="lazy"
+              decoding="async"
+              className="h-full w-full object-cover"
+            />
           </div>
         </Reveal>
 

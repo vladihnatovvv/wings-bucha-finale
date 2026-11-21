@@ -1,3 +1,5 @@
+import { siteAsset } from "@/lib/assets";
+
 export type LeadStatus = "new" | "in_progress" | "done";
 
 export type Lead = {
@@ -88,7 +90,7 @@ export const DEFAULT_CONSTRUCTION_UPDATES: ConstructionUpdate[] = [
     date: "2026-05-10",
     title: "Фундамент першої черги",
     description: "Завершено підготовку основи та бетонування ключових секцій.",
-    image: "",
+    image: siteAsset("images/construction-foundation-800.webp"),
     progress: 35,
     sortOrder: 10,
   },
@@ -97,7 +99,7 @@ export const DEFAULT_CONSTRUCTION_UPDATES: ConstructionUpdate[] = [
     date: "2026-06-18",
     title: "Моноліт і стіни",
     description: "Виконується зведення несучих конструкцій і зовнішніх стін.",
-    image: "",
+    image: siteAsset("images/construction-walls-800.webp"),
     progress: 52,
     sortOrder: 20,
   },
@@ -106,14 +108,14 @@ export const DEFAULT_CONSTRUCTION_UPDATES: ConstructionUpdate[] = [
     date: "2026-07-22",
     title: "Інженерні мережі",
     description: "Підготовлено траси під газ, електрику, воду та каналізацію.",
-    image: "",
+    image: siteAsset("images/construction-utilities-800.webp"),
     progress: 64,
     sortOrder: 30,
   },
 ];
 
 export const DEFAULT_SITE_SETTINGS: SiteSettings = {
-  scrollMediaVideoUrl: "",
+  scrollMediaVideoUrl: siteAsset("videos/hero-web.mp4"),
 };
 
 const CONTACTS_STORAGE_KEY = "wb_site_contacts";

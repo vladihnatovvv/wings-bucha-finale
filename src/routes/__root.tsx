@@ -121,7 +121,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         name: "description",
         content:
-          "Сучасний житловий комплекс серед природи у Бучі. єОселя, державні сертифікати, 15 хв до Києва.",
+          "Сучасне котеджне містечко серед природи у Бучі. єОселя, державні сертифікати, 15 хв до Києва.",
       },
       { name: "twitter:card", content: "summary_large_image" },
       { property: "og:title", content: "Wings Bucha — Крила Бучі" },
@@ -129,12 +129,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         property: "og:description",
         content:
-          "Сучасний житловий комплекс серед природи у Бучі. єОселя, державні сертифікати, 15 хв до Києва.",
+          "Сучасне котеджне містечко серед природи у Бучі. єОселя, державні сертифікати, 15 хв до Києва.",
       },
       {
         name: "twitter:description",
         content:
-          "Сучасний житловий комплекс серед природи у Бучі. єОселя, державні сертифікати, 15 хв до Києва.",
+          "Сучасне котеджне містечко серед природи у Бучі. єОселя, державні сертифікати, 15 хв до Києва.",
       },
       { property: "og:image", content: "/og-image.jpg" },
       { name: "twitter:image", content: "/og-image.jpg" },

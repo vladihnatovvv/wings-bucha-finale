@@ -156,8 +156,8 @@ export function CurrencyCalculator() {
               <div className="mt-5 flex items-start gap-3 rounded-md bg-primary-soft p-4 text-sm text-forest">
                 <Calculator className="mt-0.5 h-4 w-4 shrink-0" />
                 <p>
-                  Розрахунок орієнтовний. Фінальну вартість, умови розстрочки чи єОселі підтверджує
-                  менеджер.
+                  Розрахунок орієнтовний. Фінальну вартість, умови розтермінування чи єОселі
+                  підтверджує менеджер.
                 </p>
               </div>
             </div>
