@@ -11,12 +11,15 @@ import {
   DEFAULT_CONSTRUCTION_UPDATES,
   DEFAULT_CONTACTS,
   DEFAULT_DOCUMENTS,
+  DEFAULT_SITE_SECTIONS,
   DEFAULT_SITE_SETTINGS,
+  mergeSections,
   type ConstructionUpdate,
   type Lead,
   type LeadStatus,
   type SiteContacts,
   type SiteDocument,
+  type SiteSections,
   type SiteSettings,
 } from "@/lib/admin-store";
 import {
@@ -136,8 +139,11 @@ function toConstructionUpdate(row: DbConstructionUpdate): ConstructionUpdate {
 }
 
 function toSiteSettings(row: DbSiteSettings): SiteSettings {
+  const sectionsContent = (row as { sectionsContent?: unknown }).sectionsContent as
+    Partial<SiteSections> | null | undefined;
   return {
-    scrollMediaVideoUrl: row.scrollMediaVideoUrl,
+    scrollMediaVideoUrl: row.scrollMediaVideoUrl || DEFAULT_SITE_SETTINGS.scrollMediaVideoUrl,
+    sections: mergeSections(DEFAULT_SITE_SECTIONS, sectionsContent),
   };
 }
 
@@ -187,7 +193,11 @@ async function ensureDefaults() {
   await prisma.siteSettings.upsert({
     where: { id: 1 },
     update: {},
-    create: { id: 1, ...DEFAULT_SITE_SETTINGS },
+    create: {
+      id: 1,
+      scrollMediaVideoUrl: DEFAULT_SITE_SETTINGS.scrollMediaVideoUrl,
+      sectionsContent: DEFAULT_SITE_SECTIONS as any,
+    },
   });
 
   const documentsCount = await prisma.siteDocument.count();
@@ -397,16 +407,39 @@ export async function deleteConstructionUpdate(id: string) {
 export async function readSiteSettings(): Promise<SiteSettings> {
   if (!hasDatabaseUrl()) return DEFAULT_SITE_SETTINGS;
   await ensureDefaults();
-  const row = await prisma.siteSettings.findUnique({ where: { id: 1 } });
-  return row ? toSiteSettings(row) : DEFAULT_SITE_SETTINGS;
+  try {
+    const row = await prisma.siteSettings.findUnique({ where: { id: 1 } });
+    return row ? toSiteSettings(row) : DEFAULT_SITE_SETTINGS;
+  } catch (error) {
+    console.error("Error reading site settings from DB, falling back to defaults", error);
+    return DEFAULT_SITE_SETTINGS;
+  }
 }
 
 export async function writeSiteSettings(settings: SiteSettings): Promise<SiteSettings> {
   requireDb();
-  const row = await prisma.siteSettings.upsert({
-    where: { id: 1 },
-    update: settings,
-    create: { id: 1, ...settings },
-  });
-  return toSiteSettings(row);
+  const payload = {
+    scrollMediaVideoUrl: settings.scrollMediaVideoUrl,
+    sectionsContent: (settings.sections ?? DEFAULT_SITE_SECTIONS) as any,
+  };
+
+  try {
+    const row = await prisma.siteSettings.upsert({
+      where: { id: 1 },
+      update: payload,
+      create: { id: 1, ...payload },
+    });
+    return toSiteSettings(row);
+  } catch (error) {
+    console.error("Failed to save sectionsContent in DB, trying legacy update", error);
+    const row = await prisma.siteSettings.upsert({
+      where: { id: 1 },
+      update: { scrollMediaVideoUrl: settings.scrollMediaVideoUrl },
+      create: { id: 1, scrollMediaVideoUrl: settings.scrollMediaVideoUrl },
+    });
+    return {
+      scrollMediaVideoUrl: row.scrollMediaVideoUrl,
+      sections: settings.sections ?? DEFAULT_SITE_SECTIONS,
+    };
+  }
 }

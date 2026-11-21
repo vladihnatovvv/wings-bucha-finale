@@ -16,6 +16,7 @@ import {
   Home as HomeIcon,
   Leaf,
   ArrowRight,
+  CheckCircle2,
 } from "lucide-react";
 import { lazy, Suspense, useEffect, useState, useRef } from "react";
 import { motion, useScroll, useTransform, useSpring, AnimatePresence } from "motion/react";
@@ -29,11 +30,13 @@ import {
   DEFAULT_CONSTRUCTION_UPDATES,
   DEFAULT_CONTACTS,
   DEFAULT_DOCUMENTS,
+  DEFAULT_SITE_SECTIONS,
   DEFAULT_SITE_SETTINGS,
   readConstructionUpdates,
   readSiteContacts,
   readSiteDocuments,
   readSiteSettings,
+  type SiteSections,
 } from "@/lib/admin-store";
 import { fmtUsd, getHouses } from "@/lib/houses";
 import {
@@ -100,8 +103,26 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
+  const readSettingsServer = useServerFn(readSiteSettingsFn);
+  const [settings, setSettings] = useState(DEFAULT_SITE_SETTINGS);
   const { scrollYProgress } = useScroll();
   const scaleX = useSpring(scrollYProgress, { stiffness: 100, damping: 30, restDelta: 0.001 });
+
+  useEffect(() => {
+    let alive = true;
+    readSettingsServer()
+      .then((serverSettings) => {
+        if (alive) setSettings(serverSettings);
+      })
+      .catch(() => {
+        if (alive) setSettings(readSiteSettings());
+      });
+    return () => {
+      alive = false;
+    };
+  }, [readSettingsServer]);
+
+  const sections = settings.sections ?? DEFAULT_SITE_SECTIONS;
 
   return (
     <div className="min-h-screen bg-background overflow-x-clip">
@@ -112,21 +133,21 @@ function Index() {
       <Header />
       <main>
         <Hero />
-        <ScrollVideo />
-        <Marquee />
-        <About />
+        <ScrollVideo videoUrl={settings.scrollMediaVideoUrl} />
+        <Marquee items={sections.marquee} />
+        <About content={sections.about} />
         <LazyOnView anchorId="houses" minHeight="70vh">
           <LazyHouseSelector />
         </LazyOnView>
-        <Masterplan />
+        <Masterplan content={sections.masterplan} />
         <ConstructionProgress />
-        <Financing />
+        <Financing content={sections.financing} />
         <LazyOnView anchorId="calculator" minHeight="60vh">
           <LazyCurrencyCalculator />
         </LazyOnView>
         <Documents />
-        <Location />
-        <Contact />
+        <Location content={sections.location} />
+        <Contact content={sections.contactCta} />
       </main>
 
       <Footer />
@@ -371,7 +392,7 @@ function HeroStat({ value, label, italic }: { value: string; label: string; ital
 }
 
 /* ───────── SCROLL MEDIA ───────── */
-function ScrollVideo() {
+function ScrollVideo({ videoUrl }: { videoUrl?: string }) {
   const readSettingsServer = useServerFn(readSiteSettingsFn);
   const ref = useRef<HTMLDivElement>(null);
   const [settings, setSettings] = useState(DEFAULT_SITE_SETTINGS);
@@ -382,9 +403,11 @@ function ScrollVideo() {
   const width = useTransform(scrollYProgress, [0, 0.5], ["32%", "100%"]);
   const height = useTransform(scrollYProgress, [0, 0.5], ["38vh", "100vh"]);
   const radius = useTransform(scrollYProgress, [0, 0.5], [32, 0]);
-  const videoSrc = settings.scrollMediaVideoUrl.trim() || DEFAULT_SITE_SETTINGS.scrollMediaVideoUrl;
+  const activeVideo =
+    (videoUrl ?? settings.scrollMediaVideoUrl).trim() || DEFAULT_SITE_SETTINGS.scrollMediaVideoUrl;
 
   useEffect(() => {
+    if (videoUrl !== undefined) return;
     let alive = true;
     readSettingsServer()
       .then((serverSettings) => {
@@ -396,7 +419,7 @@ function ScrollVideo() {
     return () => {
       alive = false;
     };
-  }, [readSettingsServer]);
+  }, [readSettingsServer, videoUrl]);
 
   useEffect(() => {
     const element = ref.current;
@@ -421,9 +444,9 @@ function ScrollVideo() {
           style={{ width, height, borderRadius: radius }}
           className="relative overflow-hidden shadow-[0_40px_120px_-30px_rgba(0,0,0,0.45)] will-change-[width,height]"
         >
-          {videoSrc ? (
+          {activeVideo ? (
             <video
-              src={loadVideo ? videoSrc : undefined}
+              src={loadVideo ? activeVideo : undefined}
               poster={loadVideo ? heroPoster : undefined}
               autoPlay
               muted
@@ -486,20 +509,13 @@ function Stat({ value, label, delay = 0 }: { value: string; label: string; delay
 }
 
 /* ───────── MARQUEE ───────── */
-function Marquee() {
-  const items = [
-    "Преміальне котеджне містечко",
-    "єОселя 3% / 7%",
-    "Сосновий ліс",
-    "15 хв до Києва",
-    "Повна газифікація",
-    "Закрита територія",
-    "Державні сертифікати",
-  ];
+function Marquee({ items }: { items?: string[] }) {
+  const displayItems =
+    Array.isArray(items) && items.length > 0 ? items : DEFAULT_SITE_SECTIONS.marquee;
   return (
     <div className="border-y border-border bg-primary-soft/40 py-5 overflow-hidden">
       <div className="flex animate-marquee whitespace-nowrap gap-12">
-        {[...items, ...items, ...items].map((t, i) => (
+        {[...displayItems, ...displayItems, ...displayItems].map((t, i) => (
           <span
             key={i}
             className="inline-flex items-center gap-3 text-sm font-semibold uppercase tracking-[0.18em] text-forest"
@@ -512,45 +528,37 @@ function Marquee() {
   );
 }
 
+const ABOUT_ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+  TreePine,
+  Flame,
+  MapPin,
+  ShieldCheck,
+  Sparkles,
+  Home: HomeIcon,
+  Building2,
+  Leaf,
+  Wallet,
+  CheckCircle2,
+};
+
 /* ───────── ABOUT ───────── */
-function About() {
-  const items = [
-    {
-      icon: TreePine,
-      title: "Серед природи",
-      text: "Сосновий ліс довкола, тиша та свіже повітря щодня.",
-    },
-    {
-      icon: Flame,
-      title: "Повна газифікація",
-      text: "Магістральний газ — економія та надійність опалення.",
-    },
-    {
-      icon: MapPin,
-      title: "15 хвилин до Києва",
-      text: "Зручний виїзд, поруч траси та громадський транспорт.",
-    },
-    {
-      icon: ShieldCheck,
-      title: "Надійний забудовник",
-      text: "Всі дозволи в наявності, прозора документація.",
-    },
-  ];
+function About({ content }: { content?: SiteSections["about"] }) {
+  const activeContent = content ?? DEFAULT_SITE_SECTIONS.about;
+  const { eyebrow, title, description, image, items } = activeContent;
+  const imageSrc = image.trim() || aboutWide;
+
   return (
     <section id="about" className="container-x py-24 md:py-32">
       <div className="grid gap-12 md:grid-cols-[1fr_1.2fr] md:items-end">
         <Reveal>
-          <Eyebrow>Про містечко</Eyebrow>
-          <h2 className="mt-3 text-4xl font-bold tracking-tight md:text-6xl">
-            Жити серед природи,
-            <br />
-            <span className="text-shimmer">залишаючись поруч</span> з містом
+          <Eyebrow>{eyebrow || "Про містечко"}</Eyebrow>
+          <h2 className="mt-3 text-4xl font-bold tracking-tight md:text-6xl whitespace-pre-line">
+            {title}
           </h2>
         </Reveal>
         <Reveal delay={0.15}>
-          <p className="text-base leading-relaxed text-muted-foreground md:text-lg">
-            Wings Bucha поєднує сучасну архітектуру, природне оточення та продумане планування для
-            сімейного життя. Кожен дім — це простір для родини, де хочеться повертатись.
+          <p className="text-base leading-relaxed text-muted-foreground md:text-lg whitespace-pre-line">
+            {description}
           </p>
         </Reveal>
       </div>
@@ -559,8 +567,10 @@ function About() {
         <Parallax offset={30}>
           <div className="mt-12 overflow-hidden rounded-[2rem] shadow-card">
             <img
-              src={aboutWide}
-              srcSet={`${aboutWide} 800w, ${aboutWideLarge} 1600w`}
+              src={imageSrc}
+              srcSet={
+                imageSrc === aboutWide ? `${aboutWide} 800w, ${aboutWideLarge} 1600w` : undefined
+              }
               sizes="(min-width: 768px) 90vw, 100vw"
               alt="Wings Bucha — архітектура котеджного містечка"
               width={1600}
@@ -574,24 +584,27 @@ function About() {
       </Reveal>
 
       <div className="mt-16 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
-        {items.map((it, i) => (
-          <Reveal key={it.title} delay={i * 0.1}>
-            <div className="group relative h-full overflow-hidden rounded-3xl border border-border bg-card p-7 shadow-card hover-lift hover:border-primary/40 hover:shadow-soft">
-              <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full bg-primary-soft opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
-              <motion.div
-                whileHover={{ rotate: -8, scale: 1.1 }}
-                transition={{ type: "spring", stiffness: 300 }}
-                className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-primary-soft text-forest"
-              >
-                <it.icon className="h-7 w-7" />
-              </motion.div>
-              <h3 className="relative mt-6 text-lg font-semibold">{it.title}</h3>
-              <p className="relative mt-2 text-sm leading-relaxed text-muted-foreground">
-                {it.text}
-              </p>
-            </div>
-          </Reveal>
-        ))}
+        {items.map((it, i) => {
+          const IconComp = ABOUT_ICON_MAP[it.icon] ?? TreePine;
+          return (
+            <Reveal key={it.title + i} delay={i * 0.1}>
+              <div className="group relative h-full overflow-hidden rounded-3xl border border-border bg-card p-7 shadow-card hover-lift hover:border-primary/40 hover:shadow-soft">
+                <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full bg-primary-soft opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+                <motion.div
+                  whileHover={{ rotate: -8, scale: 1.1 }}
+                  transition={{ type: "spring", stiffness: 300 }}
+                  className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-primary-soft text-forest"
+                >
+                  <IconComp className="h-7 w-7" />
+                </motion.div>
+                <h3 className="relative mt-6 text-lg font-semibold">{it.title}</h3>
+                <p className="relative mt-2 text-sm leading-relaxed text-muted-foreground whitespace-pre-line">
+                  {it.text}
+                </p>
+              </div>
+            </Reveal>
+          );
+        })}
       </div>
     </section>
   );
@@ -748,39 +761,11 @@ function Tag({ children }: { children: React.ReactNode }) {
 }
 
 /* ───────── FINANCING ───────── */
-function Financing() {
-  const programs = [
-    {
-      tag: "єОселя",
-      rate: "3% / 7%",
-      title: "Державна іпотека єОселя",
-      text: "Ставка 3% для військових, медиків, освітян та ВПО. 7% для решти категорій. Перший внесок від 20%.",
-    },
-    {
-      tag: "Ощадбанк",
-      rate: "від 9%",
-      title: "Кредит від Ощадбанку",
-      text: "Партнерська іпотечна програма. Швидке рішення, термін до 20 років, мінімальний пакет документів.",
-    },
-    {
-      tag: "Сертифікат",
-      rate: "100%",
-      title: "Житловий сертифікат",
-      text: "Приймаємо державні житлові сертифікати, отримані за пошкоджене або знищене житло.",
-    },
-    {
-      tag: "Ваучер",
-      rate: "100%",
-      title: "Житловий ваучер",
-      text: "Зараховуємо суму ваучера за Постановою 1176 у вартість житла. Допомагаємо з оформленням та супроводом.",
-    },
-    {
-      tag: "Розтермінування",
-      rate: "0%",
-      title: "Безвідсоткове розтермінування",
-      text: "До 24 місяців без переплат від забудовника. Перший внесок від 30%.",
-    },
-  ];
+function Financing({ content }: { content?: SiteSections["financing"] }) {
+  const activeContent = content ?? DEFAULT_SITE_SECTIONS.financing;
+  const { eyebrow, title, description, image, programs } = activeContent;
+  const imageSrc = image.trim() || financingPhoto;
+
   return (
     <section id="financing" className="container-x py-24 md:py-32">
       <Reveal>
@@ -789,14 +774,11 @@ function Financing() {
 
           <div className="relative grid gap-12 lg:grid-cols-[1fr_1.4fr]">
             <div>
-              <Eyebrow>Умови придбання</Eyebrow>
-              <h2 className="mt-3 text-4xl font-bold tracking-tight md:text-5xl">
-                Кредит за <span className="text-shimmer">єОселя</span> та державні сертифікати
+              <Eyebrow>{eyebrow || "Умови придбання"}</Eyebrow>
+              <h2 className="mt-3 text-4xl font-bold tracking-tight md:text-5xl whitespace-pre-line">
+                {title}
               </h2>
-              <p className="mt-5 text-muted-foreground">
-                Wings Bucha акредитовано у програмах державної підтримки. Допомагаємо з оформленням
-                документів та супроводжуємо угоду до ключів.
-              </p>
+              <p className="mt-5 text-muted-foreground whitespace-pre-line">{description}</p>
               <a
                 href="#contact"
                 className="group mt-7 inline-flex h-12 items-center rounded-full bg-primary px-7 text-sm font-semibold text-primary-foreground shadow-soft hover:shadow-[0_20px_40px_-15px_oklch(0.5_0.07_150/0.5)] transition-shadow"
@@ -808,7 +790,7 @@ function Financing() {
               <Parallax offset={20}>
                 <div className="mt-8 overflow-hidden rounded-2xl shadow-soft">
                   <img
-                    src={financingPhoto}
+                    src={imageSrc}
                     alt="Таунхауси Wings Bucha"
                     width={720}
                     height={540}
@@ -822,7 +804,7 @@ function Financing() {
 
             <div className="grid gap-4">
               {programs.map((p, i) => (
-                <Reveal key={p.title} delay={i * 0.12}>
+                <Reveal key={p.title + i} delay={i * 0.12}>
                   <motion.div
                     whileHover={{ x: 6 }}
                     transition={{ type: "spring", stiffness: 300 }}
@@ -838,7 +820,9 @@ function Financing() {
                     </div>
                     <div>
                       <h3 className="text-base font-semibold">{p.title}</h3>
-                      <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{p.text}</p>
+                      <p className="mt-1 text-sm leading-relaxed text-muted-foreground whitespace-pre-line">
+                        {p.text}
+                      </p>
                     </div>
                   </motion.div>
                 </Reveal>
@@ -852,27 +836,23 @@ function Financing() {
 }
 
 /* ───────── MASTERPLAN ───────── */
-function Masterplan() {
+function Masterplan({ content }: { content?: SiteSections["masterplan"] }) {
+  const activeContent = content ?? DEFAULT_SITE_SECTIONS.masterplan;
+  const { eyebrow, title, description, image, points } = activeContent;
+  const imageSrc = image.trim() || masterplan;
+
   return (
     <section className="container-x pt-5 pb-24 md:pb-32">
       <div className="grid gap-12 md:grid-cols-[1fr_1.6fr] md:items-center">
         <Reveal>
-          <Eyebrow>Генплан</Eyebrow>
-          <h2 className="mt-3 text-4xl font-bold tracking-tight md:text-5xl">
-            Територія Wings Bucha
+          <Eyebrow>{eyebrow || "Генплан"}</Eyebrow>
+          <h2 className="mt-3 text-4xl font-bold tracking-tight md:text-5xl whitespace-pre-line">
+            {title}
           </h2>
-          <p className="mt-4 text-muted-foreground">
-            7+ гектарів продуманого простору: пішохідні алеї, дитячі майданчики, зелені дворики без
-            авто, власна інфраструктура та цілодобова охорона.
-          </p>
+          <p className="mt-4 text-muted-foreground whitespace-pre-line">{description}</p>
           <ul className="mt-7 space-y-3.5 text-sm">
-            {[
-              "Закрита територія з охороною",
-              "Дитячі та спортивні майданчики",
-              "Двори без авто",
-              "Гостьовий паркінг",
-            ].map((t, i) => (
-              <Reveal key={t} delay={i * 0.08}>
+            {points.map((t, i) => (
+              <Reveal key={t + i} delay={i * 0.08}>
                 <li className="flex items-center gap-3">
                   <span className="h-2 w-2 rounded-full bg-primary" /> {t}
                 </li>
@@ -884,8 +864,12 @@ function Masterplan() {
           <Parallax offset={40}>
             <div className="overflow-hidden rounded-[2rem] shadow-card hover-lift">
               <img
-                src={masterplan}
-                srcSet={`${masterplan} 800w, ${masterplanLarge} 1200w`}
+                src={imageSrc}
+                srcSet={
+                  imageSrc === masterplan
+                    ? `${masterplan} 800w, ${masterplanLarge} 1200w`
+                    : undefined
+                }
                 sizes="(min-width: 768px) 60vw, 100vw"
                 alt="Генплан Wings Bucha"
                 width={1200}
@@ -1139,34 +1123,27 @@ function formatDate(value: string) {
 }
 
 /* ───────── LOCATION ───────── */
-function Location() {
+function Location({ content }: { content?: SiteSections["location"] }) {
+  const activeContent = content ?? DEFAULT_SITE_SECTIONS.location;
+  const { eyebrow, title, description, mapUrl, points } = activeContent;
+
   return (
     <section id="location" className="container-x py-24 md:py-32">
       <div className="grid gap-12 md:grid-cols-[1fr_1.6fr]">
         <Reveal>
-          <Eyebrow>Локація</Eyebrow>
-          <h2 className="mt-3 text-4xl font-bold tracking-tight md:text-5xl">
-            м. Буча,
-            <br />
-            вул. Лісова, 28
+          <Eyebrow>{eyebrow || "Локація"}</Eyebrow>
+          <h2 className="mt-3 text-4xl font-bold tracking-tight md:text-5xl whitespace-pre-line">
+            {title}
           </h2>
-          <p className="mt-4 text-muted-foreground">
-            15 хвилин до Києва, поруч траса Київ–Ковель. Розвинена інфраструктура: садочки, школи,
-            супермаркети, аптеки.
-          </p>
+          <p className="mt-4 text-muted-foreground whitespace-pre-line">{description}</p>
           <ul className="mt-7 space-y-3 text-sm">
-            {[
-              ["3 хв", "до садочка та школи"],
-              ["5 хв", "до супермаркету"],
-              ["8 хв", "до залізничної станції"],
-              ["15 хв", "до Києва"],
-            ].map(([t, p], i) => (
-              <Reveal key={t} delay={i * 0.08}>
+            {points.map((pt, i) => (
+              <Reveal key={pt.time + pt.text + i} delay={i * 0.08}>
                 <li className="flex items-center gap-3">
                   <span className="rounded-full bg-primary-soft px-3 py-1 text-xs font-bold text-forest">
-                    {t}
+                    {pt.time}
                   </span>
-                  <span className="text-muted-foreground">{p}</span>
+                  <span className="text-muted-foreground">{pt.text}</span>
                 </li>
               </Reveal>
             ))}
@@ -1176,7 +1153,10 @@ function Location() {
           <div className="overflow-hidden rounded-[2rem] border border-border shadow-card">
             <iframe
               title="Wings Bucha — м. Буча"
-              src="https://maps.google.com/maps?q=Bucha%2C%20Lisova%20St&t=&z=13&ie=UTF8&iwloc=&output=embed"
+              src={
+                mapUrl ||
+                "https://maps.google.com/maps?q=Bucha%2C%20Lisova%20St&t=&z=13&ie=UTF8&iwloc=&output=embed"
+              }
               className="h-full min-h-[460px] w-full"
               loading="lazy"
             />
@@ -1188,7 +1168,11 @@ function Location() {
 }
 
 /* ───────── CONTACT ───────── */
-function Contact() {
+function Contact({ content }: { content?: SiteSections["contactCta"] }) {
+  const activeContent = content ?? DEFAULT_SITE_SECTIONS.contactCta;
+  const { badge, title, description, image } = activeContent;
+  const imageSrc = image.trim() || contactPhoto;
+
   const readSiteContactsServer = useServerFn(readSiteContactsFn);
   const [contacts, setContacts] = useState(DEFAULT_CONTACTS);
 
@@ -1221,16 +1205,13 @@ function Contact() {
       <div className="container-x relative grid gap-12 py-24 md:grid-cols-[1fr_1.1fr] md:py-32">
         <Reveal>
           <span className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] backdrop-blur">
-            <Sparkles className="h-3.5 w-3.5" /> Записатись
+            <Sparkles className="h-3.5 w-3.5" /> {badge || "Записатись"}
           </span>
-          <h2 className="mt-5 text-5xl font-bold leading-[1.02] tracking-tight md:text-7xl">
-            Розправ крила
-            <br />
-            вдома
+          <h2 className="mt-5 text-5xl font-bold leading-[1.02] tracking-tight md:text-7xl whitespace-pre-line">
+            {title}
           </h2>
-          <p className="mt-6 max-w-md text-base leading-relaxed text-primary-foreground/85">
-            Залиште контакт — менеджер зателефонує впродовж 15 хвилин у робочий час, розрахує умови
-            та запросить на огляд котеджного містечка.
+          <p className="mt-6 max-w-md text-base leading-relaxed text-primary-foreground/85 whitespace-pre-line">
+            {description}
           </p>
           <div className="mt-9 space-y-3 text-sm">
             <div>
@@ -1250,7 +1231,7 @@ function Contact() {
 
           <div className="mt-8 overflow-hidden rounded-[1.5rem] ring-1 ring-white/20">
             <img
-              src={contactPhoto}
+              src={imageSrc}
               alt="Сітіхауси Wings Bucha"
               width={720}
               height={540}

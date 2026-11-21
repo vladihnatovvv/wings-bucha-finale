@@ -97,6 +97,7 @@ model ConstructionUpdate {
 model SiteSettings {
   id                  Int      @id @default(1)
   scrollMediaVideoUrl String   @default("") @map("scroll_media_video_url") @db.Text
+  sectionsContent     Json?    @map("sections_content")
   updatedAt           DateTime @updatedAt @map("updated_at")
 
   @@map("site_settings")

@@ -8,6 +8,7 @@ import {
   HardHat,
   Home,
   ImagePlus,
+  Layers,
   LockKeyhole,
   LogOut,
   Phone,
@@ -45,6 +46,7 @@ import {
   DEFAULT_CONSTRUCTION_UPDATES,
   DEFAULT_CONTACTS,
   DEFAULT_DOCUMENTS,
+  DEFAULT_SITE_SECTIONS,
   DEFAULT_SITE_SETTINGS,
   readConstructionUpdates,
   readLeads,
@@ -61,6 +63,7 @@ import {
   type LeadStatus,
   type SiteDocument,
   type SiteContacts,
+  type SiteSections,
   type SiteSettings,
 } from "@/lib/admin-store";
 import {
@@ -95,10 +98,11 @@ export const Route = createFileRoute("/admin")({
   component: AdminPage,
 });
 
-type Tab = "houses" | "documents" | "construction" | "media" | "leads" | "contacts";
+type Tab = "houses" | "sections" | "documents" | "construction" | "media" | "leads" | "contacts";
 
 const tabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: "houses", label: "Об'єкти", icon: Building2 },
+  { id: "sections", label: "Секції сайту", icon: Layers },
   { id: "documents", label: "Документи", icon: FileText },
   { id: "construction", label: "Хід будівництва", icon: HardHat },
   { id: "media", label: "Медіа", icon: Video },
@@ -244,6 +248,7 @@ function AdminPage() {
         </div>
 
         {tab === "houses" && <HousesAdmin onNotice={flash} />}
+        {tab === "sections" && <SectionsAdmin onNotice={flash} />}
         {tab === "documents" && <DocumentsAdmin onNotice={flash} />}
         {tab === "construction" && <ConstructionAdmin onNotice={flash} />}
         {tab === "media" && <MediaAdmin onNotice={flash} />}
@@ -1084,6 +1089,806 @@ function ContactsAdmin({ onNotice }: { onNotice: (message: string) => void }) {
   );
 }
 
+const ABOUT_ICON_OPTIONS: { value: string; label: string }[] = [
+  { value: "TreePine", label: "🌲 Сосна / Ліс (TreePine)" },
+  { value: "Flame", label: "🔥 Газ / Опалення (Flame)" },
+  { value: "MapPin", label: "📍 Локація (MapPin)" },
+  { value: "ShieldCheck", label: "🛡️ Безпека / Надійність (ShieldCheck)" },
+  { value: "Sparkles", label: "✨ Преміум (Sparkles)" },
+  { value: "Home", label: "🏠 Дім (Home)" },
+  { value: "Building2", label: "🏢 Будівля / Таунхаус (Building2)" },
+  { value: "Leaf", label: "🍃 Природа / Еко (Leaf)" },
+  { value: "Wallet", label: "💳 Кредит / Фінанси (Wallet)" },
+  { value: "CheckCircle2", label: "✅ Перевірено (CheckCircle2)" },
+];
+
+function SectionsAdmin({ onNotice }: { onNotice: (message: string) => void }) {
+  const readSettingsServer = useServerFn(readSiteSettingsFn);
+  const writeSettingsServer = useServerFn(writeSiteSettingsFn);
+  const uploadImageServer = useServerFn(uploadAdminImageFn);
+
+  const [settings, setSettings] = useState<SiteSettings>(() => readSiteSettings());
+  const [sections, setSections] = useState<SiteSections>(
+    () => settings.sections ?? DEFAULT_SITE_SECTIONS,
+  );
+  const [subTab, setSubTab] = useState<
+    "about" | "marquee" | "masterplan" | "financing" | "location" | "contactCta"
+  >("about");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    readSettingsServer()
+      .then((serverSettings) => {
+        if (!alive) return;
+        setSettings(serverSettings);
+        setSections(serverSettings.sections ?? DEFAULT_SITE_SECTIONS);
+      })
+      .catch(() => {
+        if (!alive) return;
+        const local = readSiteSettings();
+        setSettings(local);
+        setSections(local.sections ?? DEFAULT_SITE_SECTIONS);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [readSettingsServer]);
+
+  async function handleUpload(file: File, onDone: (url: string) => void, prefix: string) {
+    try {
+      const dataUrl = await optimizeImageFile(file);
+      const cleanFile = dataUrlToFile(dataUrl, `${prefix}-${Date.now()}.jpg`);
+      const formData = new FormData();
+      formData.append("file", cleanFile);
+      const res = await uploadImageServer({ data: formData });
+      onDone(res.url);
+      onNotice("Зображення завантажено. Не забудьте натиснути «Зберегти».");
+    } catch {
+      onNotice("Не вдалося завантажити зображення на сервер.");
+    }
+  }
+
+  async function save() {
+    setSaving(true);
+    const updated: SiteSettings = {
+      ...settings,
+      sections,
+    };
+    try {
+      const saved = await writeSettingsServer({ data: updated });
+      setSettings(saved);
+      setSections(saved.sections ?? DEFAULT_SITE_SECTIONS);
+      onNotice("Зміни секцій успішно збережено в базі!");
+    } catch {
+      writeSiteSettings(updated);
+      setSettings(updated);
+      onNotice("База недоступна, зміни збережено локально.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function reset() {
+    if (!window.confirm("Скинути наповнення секцій до стандартного?")) return;
+    setSections(DEFAULT_SITE_SECTIONS);
+    onNotice("Секції скинуто. Натисніть «Зберегти», щоб зафіксувати.");
+  }
+
+  const subTabs = [
+    { id: "about", label: "Про містечко" },
+    { id: "marquee", label: "Рядок переваг (Тікер)" },
+    { id: "masterplan", label: "Генплан" },
+    { id: "financing", label: "Умови придбання / єОселя" },
+    { id: "location", label: "Локація" },
+    { id: "contactCta", label: "Блок запису (CTA)" },
+  ] as const;
+
+  return (
+    <section className="rounded-lg border border-border bg-background p-5 shadow-card">
+      <AdminSectionHeader
+        title="Секції сайту"
+        description="Редагування наповнення сайту (тексти, фото, списки, програми). Головний екран Hero залишається фіксованим."
+      >
+        <button
+          onClick={reset}
+          className="inline-flex items-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold hover:text-destructive"
+        >
+          <RotateCcw className="h-4 w-4" />
+          Скинути
+        </button>
+        <button
+          onClick={save}
+          disabled={saving}
+          className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+        >
+          <Save className="h-4 w-4" />
+          {saving ? "Збереження..." : "Зберегти зміни"}
+        </button>
+      </AdminSectionHeader>
+
+      {/* Sub-tabs pills */}
+      <div className="mt-5 flex flex-wrap gap-2 border-b border-border pb-4">
+        {subTabs.map((st) => (
+          <button
+            key={st.id}
+            onClick={() => setSubTab(st.id)}
+            className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+              subTab === st.id
+                ? "bg-primary text-primary-foreground"
+                : "border border-border bg-secondary/50 text-foreground hover:border-primary"
+            }`}
+          >
+            {st.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-6">
+        {/* ABOUT */}
+        {subTab === "about" && (
+          <div className="grid gap-6">
+            <div className="grid gap-4 md:grid-cols-2">
+              <TextField
+                label="Надзаголовок (Eyebrow)"
+                value={sections.about.eyebrow}
+                onChange={(val) =>
+                  setSections({ ...sections, about: { ...sections.about, eyebrow: val } })
+                }
+              />
+              <ImageUploadField
+                label="Широке фото містечка"
+                value={sections.about.image}
+                onChange={(val) =>
+                  setSections({ ...sections, about: { ...sections.about, image: val } })
+                }
+                onFile={(file) =>
+                  handleUpload(
+                    file,
+                    (url) =>
+                      setSections((prev) => ({ ...prev, about: { ...prev.about, image: url } })),
+                    "about",
+                  )
+                }
+              />
+            </div>
+            {sections.about.image && (
+              <img
+                src={sections.about.image}
+                alt="Про містечко"
+                className="max-h-56 w-full rounded-xl border border-border object-cover"
+              />
+            )}
+            <TextAreaField
+              label="Головний заголовок"
+              rows={2}
+              value={sections.about.title}
+              onChange={(val) =>
+                setSections({ ...sections, about: { ...sections.about, title: val } })
+              }
+            />
+            <TextAreaField
+              label="Опис секції"
+              rows={3}
+              value={sections.about.description}
+              onChange={(val) =>
+                setSections({ ...sections, about: { ...sections.about, description: val } })
+              }
+            />
+
+            <div>
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                  Картки переваг ({sections.about.items.length})
+                </h3>
+                <button
+                  onClick={() =>
+                    setSections({
+                      ...sections,
+                      about: {
+                        ...sections.about,
+                        items: [
+                          ...sections.about.items,
+                          {
+                            title: "Нова перевага",
+                            text: "Опис переваги містечка.",
+                            icon: "TreePine",
+                          },
+                        ],
+                      },
+                    })
+                  }
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1 text-xs font-semibold hover:border-primary hover:text-primary"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Додати картку
+                </button>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                {sections.about.items.map((item, idx) => (
+                  <div key={idx} className="rounded-xl border border-border bg-secondary/30 p-4">
+                    <div className="mb-3 flex items-center justify-between">
+                      <span className="text-xs font-bold text-primary">Картка #{idx + 1}</span>
+                      <button
+                        onClick={() =>
+                          setSections({
+                            ...sections,
+                            about: {
+                              ...sections.about,
+                              items: sections.about.items.filter((_, i) => i !== idx),
+                            },
+                          })
+                        }
+                        className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                        title="Видалити"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                    <div className="grid gap-3">
+                      <TextField
+                        label="Заголовок"
+                        value={item.title}
+                        onChange={(val) => {
+                          const updated = [...sections.about.items];
+                          updated[idx] = { ...updated[idx], title: val };
+                          setSections({
+                            ...sections,
+                            about: { ...sections.about, items: updated },
+                          });
+                        }}
+                      />
+                      <TextAreaField
+                        label="Текст"
+                        rows={2}
+                        value={item.text}
+                        onChange={(val) => {
+                          const updated = [...sections.about.items];
+                          updated[idx] = { ...updated[idx], text: val };
+                          setSections({
+                            ...sections,
+                            about: { ...sections.about, items: updated },
+                          });
+                        }}
+                      />
+                      <label className="grid gap-1.5">
+                        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Іконка
+                        </span>
+                        <select
+                          value={item.icon || "TreePine"}
+                          onChange={(e) => {
+                            const updated = [...sections.about.items];
+                            updated[idx] = { ...updated[idx], icon: e.target.value };
+                            setSections({
+                              ...sections,
+                              about: { ...sections.about, items: updated },
+                            });
+                          }}
+                          className="h-10 rounded-md border border-input bg-background px-3 text-sm outline-none focus:border-primary"
+                        >
+                          {ABOUT_ICON_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MARQUEE */}
+        {subTab === "marquee" && (
+          <div className="grid gap-6">
+            <div>
+              <h3 className="text-sm font-bold">Рядок переваг (Тікер)</h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Текст, що безперервно рухається горизонтальною стрічкою. Кожен пункт вказується з
+                нового рядка.
+              </p>
+            </div>
+            <TextAreaField
+              label="Пункти тікера (по одному на рядок)"
+              rows={8}
+              value={sections.marquee.join("\n")}
+              onChange={(val) => {
+                const list = val
+                  .split("\n")
+                  .map((s) => s.trim())
+                  .filter(Boolean);
+                setSections({ ...sections, marquee: list });
+              }}
+            />
+            <div>
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Попередній перегляд пунктів ({sections.marquee.length}):
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {sections.marquee.map((item, idx) => (
+                  <span
+                    key={idx}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary/60 px-3 py-1 text-xs font-medium"
+                  >
+                    🍃 {item}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MASTERPLAN */}
+        {subTab === "masterplan" && (
+          <div className="grid gap-6">
+            <div className="grid gap-4 md:grid-cols-2">
+              <TextField
+                label="Надзаголовок"
+                value={sections.masterplan.eyebrow}
+                onChange={(val) =>
+                  setSections({ ...sections, masterplan: { ...sections.masterplan, eyebrow: val } })
+                }
+              />
+              <TextField
+                label="Заголовок"
+                value={sections.masterplan.title}
+                onChange={(val) =>
+                  setSections({ ...sections, masterplan: { ...sections.masterplan, title: val } })
+                }
+              />
+            </div>
+            <TextAreaField
+              label="Опис генплану"
+              rows={3}
+              value={sections.masterplan.description}
+              onChange={(val) =>
+                setSections({
+                  ...sections,
+                  masterplan: { ...sections.masterplan, description: val },
+                })
+              }
+            />
+            <ImageUploadField
+              label="Зображення генплану (мапа території)"
+              value={sections.masterplan.image}
+              onChange={(val) =>
+                setSections({ ...sections, masterplan: { ...sections.masterplan, image: val } })
+              }
+              onFile={(file) =>
+                handleUpload(
+                  file,
+                  (url) =>
+                    setSections((prev) => ({
+                      ...prev,
+                      masterplan: { ...prev.masterplan, image: url },
+                    })),
+                  "masterplan",
+                )
+              }
+            />
+            {sections.masterplan.image && (
+              <img
+                src={sections.masterplan.image}
+                alt="Генплан"
+                className="max-h-72 w-full rounded-xl border border-border object-cover"
+              />
+            )}
+            <div>
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                  Пункти списку генплану ({sections.masterplan.points.length})
+                </h3>
+                <button
+                  onClick={() =>
+                    setSections({
+                      ...sections,
+                      masterplan: {
+                        ...sections.masterplan,
+                        points: [...sections.masterplan.points, "Новий пункт генплану"],
+                      },
+                    })
+                  }
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1 text-xs font-semibold hover:border-primary hover:text-primary"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Додати пункт
+                </button>
+              </div>
+              <div className="grid gap-2">
+                {sections.masterplan.points.map((pt, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <input
+                      value={pt}
+                      onChange={(e) => {
+                        const updated = [...sections.masterplan.points];
+                        updated[idx] = e.target.value;
+                        setSections({
+                          ...sections,
+                          masterplan: { ...sections.masterplan, points: updated },
+                        });
+                      }}
+                      className="h-10 flex-1 rounded-md border border-input bg-background px-3 text-sm outline-none focus:border-primary"
+                    />
+                    <button
+                      onClick={() => {
+                        const updated = sections.masterplan.points.filter((_, i) => i !== idx);
+                        setSections({
+                          ...sections,
+                          masterplan: { ...sections.masterplan, points: updated },
+                        });
+                      }}
+                      className="rounded p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                      title="Видалити"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* FINANCING */}
+        {subTab === "financing" && (
+          <div className="grid gap-6">
+            <div className="grid gap-4 md:grid-cols-2">
+              <TextField
+                label="Надзаголовок"
+                value={sections.financing.eyebrow}
+                onChange={(val) =>
+                  setSections({ ...sections, financing: { ...sections.financing, eyebrow: val } })
+                }
+              />
+              <TextField
+                label="Заголовок"
+                value={sections.financing.title}
+                onChange={(val) =>
+                  setSections({ ...sections, financing: { ...sections.financing, title: val } })
+                }
+              />
+            </div>
+            <TextAreaField
+              label="Опис умов фінансування"
+              rows={3}
+              value={sections.financing.description}
+              onChange={(val) =>
+                setSections({
+                  ...sections,
+                  financing: { ...sections.financing, description: val },
+                })
+              }
+            />
+            <ImageUploadField
+              label="Фото блоку фінансування"
+              value={sections.financing.image}
+              onChange={(val) =>
+                setSections({ ...sections, financing: { ...sections.financing, image: val } })
+              }
+              onFile={(file) =>
+                handleUpload(
+                  file,
+                  (url) =>
+                    setSections((prev) => ({
+                      ...prev,
+                      financing: { ...prev.financing, image: url },
+                    })),
+                  "financing",
+                )
+              }
+            />
+            {sections.financing.image && (
+              <img
+                src={sections.financing.image}
+                alt="Фінансування"
+                className="max-h-56 w-full rounded-xl border border-border object-cover"
+              />
+            )}
+
+            <div>
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                  Програми фінансування ({sections.financing.programs.length})
+                </h3>
+                <button
+                  onClick={() =>
+                    setSections({
+                      ...sections,
+                      financing: {
+                        ...sections.financing,
+                        programs: [
+                          ...sections.financing.programs,
+                          {
+                            tag: "Програма",
+                            rate: "0%",
+                            title: "Нова програма",
+                            text: "Умови придбання та процентні ставки.",
+                          },
+                        ],
+                      },
+                    })
+                  }
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1 text-xs font-semibold hover:border-primary hover:text-primary"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Додати програму
+                </button>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                {sections.financing.programs.map((prog, idx) => (
+                  <div key={idx} className="rounded-xl border border-border bg-secondary/30 p-4">
+                    <div className="mb-3 flex items-center justify-between">
+                      <span className="text-xs font-bold text-primary">Програма #{idx + 1}</span>
+                      <button
+                        onClick={() =>
+                          setSections({
+                            ...sections,
+                            financing: {
+                              ...sections.financing,
+                              programs: sections.financing.programs.filter((_, i) => i !== idx),
+                            },
+                          })
+                        }
+                        className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                        title="Видалити"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                    <div className="grid gap-3">
+                      <div className="grid grid-cols-2 gap-2">
+                        <TextField
+                          label="Тег (назва)"
+                          value={prog.tag}
+                          onChange={(val) => {
+                            const updated = [...sections.financing.programs];
+                            updated[idx] = { ...updated[idx], tag: val };
+                            setSections({
+                              ...sections,
+                              financing: { ...sections.financing, programs: updated },
+                            });
+                          }}
+                        />
+                        <TextField
+                          label="Ставка / Відсоток"
+                          value={prog.rate}
+                          onChange={(val) => {
+                            const updated = [...sections.financing.programs];
+                            updated[idx] = { ...updated[idx], rate: val };
+                            setSections({
+                              ...sections,
+                              financing: { ...sections.financing, programs: updated },
+                            });
+                          }}
+                        />
+                      </div>
+                      <TextField
+                        label="Заголовок програми"
+                        value={prog.title}
+                        onChange={(val) => {
+                          const updated = [...sections.financing.programs];
+                          updated[idx] = { ...updated[idx], title: val };
+                          setSections({
+                            ...sections,
+                            financing: { ...sections.financing, programs: updated },
+                          });
+                        }}
+                      />
+                      <TextAreaField
+                        label="Опис умов"
+                        rows={2}
+                        value={prog.text}
+                        onChange={(val) => {
+                          const updated = [...sections.financing.programs];
+                          updated[idx] = { ...updated[idx], text: val };
+                          setSections({
+                            ...sections,
+                            financing: { ...sections.financing, programs: updated },
+                          });
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* LOCATION */}
+        {subTab === "location" && (
+          <div className="grid gap-6">
+            <div className="grid gap-4 md:grid-cols-2">
+              <TextField
+                label="Надзаголовок"
+                value={sections.location.eyebrow}
+                onChange={(val) =>
+                  setSections({ ...sections, location: { ...sections.location, eyebrow: val } })
+                }
+              />
+              <TextField
+                label="Google Maps URL (embed iframe)"
+                value={sections.location.mapUrl}
+                onChange={(val) =>
+                  setSections({ ...sections, location: { ...sections.location, mapUrl: val } })
+                }
+              />
+            </div>
+            <TextAreaField
+              label="Заголовок локації"
+              rows={2}
+              value={sections.location.title}
+              onChange={(val) =>
+                setSections({ ...sections, location: { ...sections.location, title: val } })
+              }
+            />
+            <TextAreaField
+              label="Опис локації та інфраструктури"
+              rows={3}
+              value={sections.location.description}
+              onChange={(val) =>
+                setSections({ ...sections, location: { ...sections.location, description: val } })
+              }
+            />
+
+            <div>
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                  Час до ключових локацій ({sections.location.points.length})
+                </h3>
+                <button
+                  onClick={() =>
+                    setSections({
+                      ...sections,
+                      location: {
+                        ...sections.location,
+                        points: [
+                          ...sections.location.points,
+                          { time: "5 хв", text: "до нового об'єкта" },
+                        ],
+                      },
+                    })
+                  }
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1 text-xs font-semibold hover:border-primary hover:text-primary"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Додати точку
+                </button>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2">
+                {sections.location.points.map((pt, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center gap-2 rounded-lg border border-border bg-secondary/30 p-2.5"
+                  >
+                    <input
+                      placeholder="Час (напр. 5 хв)"
+                      value={pt.time}
+                      onChange={(e) => {
+                        const updated = [...sections.location.points];
+                        updated[idx] = { ...updated[idx], time: e.target.value };
+                        setSections({
+                          ...sections,
+                          location: { ...sections.location, points: updated },
+                        });
+                      }}
+                      className="h-9 w-28 rounded-md border border-input bg-background px-2.5 text-xs font-bold outline-none focus:border-primary"
+                    />
+                    <input
+                      placeholder="Куди (напр. до супермаркету)"
+                      value={pt.text}
+                      onChange={(e) => {
+                        const updated = [...sections.location.points];
+                        updated[idx] = { ...updated[idx], text: e.target.value };
+                        setSections({
+                          ...sections,
+                          location: { ...sections.location, points: updated },
+                        });
+                      }}
+                      className="h-9 flex-1 rounded-md border border-input bg-background px-2.5 text-xs outline-none focus:border-primary"
+                    />
+                    <button
+                      onClick={() => {
+                        const updated = sections.location.points.filter((_, i) => i !== idx);
+                        setSections({
+                          ...sections,
+                          location: { ...sections.location, points: updated },
+                        });
+                      }}
+                      className="rounded p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                      title="Видалити"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* CONTACT CTA */}
+        {subTab === "contactCta" && (
+          <div className="grid gap-6">
+            <div className="grid gap-4 md:grid-cols-2">
+              <TextField
+                label="Бейдж"
+                value={sections.contactCta.badge}
+                onChange={(val) =>
+                  setSections({
+                    ...sections,
+                    contactCta: { ...sections.contactCta, badge: val },
+                  })
+                }
+              />
+              <ImageUploadField
+                label="Фото блоку запису на огляд"
+                value={sections.contactCta.image}
+                onChange={(val) =>
+                  setSections({
+                    ...sections,
+                    contactCta: { ...sections.contactCta, image: val },
+                  })
+                }
+                onFile={(file) =>
+                  handleUpload(
+                    file,
+                    (url) =>
+                      setSections((prev) => ({
+                        ...prev,
+                        contactCta: { ...prev.contactCta, image: url },
+                      })),
+                    "contact",
+                  )
+                }
+              />
+            </div>
+            {sections.contactCta.image && (
+              <img
+                src={sections.contactCta.image}
+                alt="Запис на огляд"
+                className="max-h-56 w-full rounded-xl border border-border object-cover"
+              />
+            )}
+            <TextAreaField
+              label="Заголовок заклику до дії"
+              rows={2}
+              value={sections.contactCta.title}
+              onChange={(val) =>
+                setSections({
+                  ...sections,
+                  contactCta: { ...sections.contactCta, title: val },
+                })
+              }
+            />
+            <TextAreaField
+              label="Опис заклику"
+              rows={3}
+              value={sections.contactCta.description}
+              onChange={(val) =>
+                setSections({
+                  ...sections,
+                  contactCta: { ...sections.contactCta, description: val },
+                })
+              }
+            />
+            <div className="rounded-lg border border-border/80 bg-secondary/20 p-4 text-xs text-muted-foreground">
+              💡 Номери телефонів, пошта, адреса та месенджери налаштовуються у вкладці «Контакти».
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function DocumentsAdmin({ onNotice }: { onNotice: (message: string) => void }) {
   const listDocumentsServer = useServerFn(listSiteDocumentsFn);
   const saveDocumentServer = useServerFn(saveSiteDocumentFn);
@@ -1557,6 +2362,34 @@ function TextField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className="h-10 rounded-md border border-input bg-background px-3 text-sm outline-none focus:border-primary"
+      />
+    </label>
+  );
+}
+
+function TextAreaField({
+  label,
+  value,
+  onChange,
+  rows = 3,
+  className = "",
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  rows?: number;
+  className?: string;
+}) {
+  return (
+    <label className={`grid gap-1.5 ${className}`}>
+      <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        {label}
+      </span>
+      <textarea
+        rows={rows}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="rounded-md border border-input bg-background p-3 text-sm outline-none focus:border-primary"
       />
     </label>
   );

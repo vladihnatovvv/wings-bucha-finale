@@ -40,8 +40,65 @@ export type ConstructionUpdate = {
   sortOrder: number;
 };
 
+export type AboutFeatureItem = {
+  title: string;
+  text: string;
+  icon: string;
+};
+
+export type FinancingProgramItem = {
+  tag: string;
+  rate: string;
+  title: string;
+  text: string;
+};
+
+export type LocationPointItem = {
+  time: string;
+  text: string;
+};
+
+export type SiteSections = {
+  marquee: string[];
+  about: {
+    eyebrow: string;
+    title: string;
+    description: string;
+    image: string;
+    items: AboutFeatureItem[];
+  };
+  masterplan: {
+    eyebrow: string;
+    title: string;
+    description: string;
+    image: string;
+    points: string[];
+  };
+  financing: {
+    eyebrow: string;
+    title: string;
+    description: string;
+    image: string;
+    programs: FinancingProgramItem[];
+  };
+  location: {
+    eyebrow: string;
+    title: string;
+    description: string;
+    mapUrl: string;
+    points: LocationPointItem[];
+  };
+  contactCta: {
+    badge: string;
+    title: string;
+    description: string;
+    image: string;
+  };
+};
+
 export type SiteSettings = {
   scrollMediaVideoUrl: string;
+  sections?: SiteSections;
 };
 
 export const DEFAULT_CONTACTS: SiteContacts = {
@@ -114,8 +171,170 @@ export const DEFAULT_CONSTRUCTION_UPDATES: ConstructionUpdate[] = [
   },
 ];
 
+export const DEFAULT_SITE_SECTIONS: SiteSections = {
+  marquee: [
+    "Преміальне котеджне містечко",
+    "єОселя 3% / 7%",
+    "Сосновий ліс",
+    "15 хв до Києва",
+    "Повна газифікація",
+    "Закрита територія",
+    "Державні сертифікати",
+  ],
+  about: {
+    eyebrow: "Про містечко",
+    title: "Жити серед природи,\nзалишаючись поруч з містом",
+    description:
+      "Wings Bucha поєднує сучасну архітектуру, природне оточення та продумане планування для сімейного життя. Кожен дім — це простір для родини, де хочеться повертатись.",
+    image: siteAsset("images/about-wide-800.webp"),
+    items: [
+      {
+        title: "Серед природи",
+        text: "Сосновий ліс довкола, тиша та свіже повітря щодня.",
+        icon: "TreePine",
+      },
+      {
+        title: "Повна газифікація",
+        text: "Магістральний газ — економія та надійність опалення.",
+        icon: "Flame",
+      },
+      {
+        title: "15 хвилин до Києва",
+        text: "Зручний виїзд, поруч траси та громадський транспорт.",
+        icon: "MapPin",
+      },
+      {
+        title: "Надійний забудовник",
+        text: "Всі дозволи в наявності, прозора документація.",
+        icon: "ShieldCheck",
+      },
+    ],
+  },
+  masterplan: {
+    eyebrow: "Генплан",
+    title: "Територія Wings Bucha",
+    description:
+      "7+ гектарів продуманого простору: пішохідні алеї, дитячі майданчики, зелені дворики без авто, власна інфраструктура та цілодобова охорона.",
+    image: siteAsset("images/masterplan-800.webp"),
+    points: [
+      "Закрита територія з охороною",
+      "Дитячі та спортивні майданчики",
+      "Двори без авто",
+      "Гостьовий паркінг",
+    ],
+  },
+  financing: {
+    eyebrow: "Умови придбання",
+    title: "Кредит за єОселя та державні сертифікати",
+    description:
+      "Wings Bucha акредитовано у програмах державної підтримки. Допомагаємо з оформленням документів та супроводжуємо угоду до ключів.",
+    image: siteAsset("images/financing-720.webp"),
+    programs: [
+      {
+        tag: "єОселя",
+        rate: "3% / 7%",
+        title: "Державна іпотека єОселя",
+        text: "Ставка 3% для військових, медиків, освітян та ВПО. 7% для решти категорій. Перший внесок від 20%.",
+      },
+      {
+        tag: "Ощадбанк",
+        rate: "від 9%",
+        title: "Кредит від Ощадбанку",
+        text: "Партнерська іпотечна програма. Швидке рішення, термін до 20 років, мінімальний пакет документів.",
+      },
+      {
+        tag: "Сертифікат",
+        rate: "100%",
+        title: "Житловий сертифікат",
+        text: "Приймаємо державні житлові сертифікати, отримані за пошкоджене або знищене житло.",
+      },
+      {
+        tag: "Ваучер",
+        rate: "100%",
+        title: "Житловий ваучер",
+        text: "Зараховуємо суму ваучера за Постановою 1176 у вартість житла. Допомагаємо з оформленням та супроводом.",
+      },
+      {
+        tag: "Розтермінування",
+        rate: "0%",
+        title: "Безвідсоткове розтермінування",
+        text: "До 24 місяців без переплат від забудовника. Перший внесок від 30%.",
+      },
+    ],
+  },
+  location: {
+    eyebrow: "Локація",
+    title: "м. Буча,\nвул. Лісова, 28",
+    description:
+      "15 хвилин до Києва, поруч траса Київ–Ковель. Розвинена інфраструктура: садочки, школи, супермаркети, аптеки.",
+    mapUrl:
+      "https://maps.google.com/maps?q=Bucha%2C%20Lisova%20St&t=&z=13&ie=UTF8&iwloc=&output=embed",
+    points: [
+      { time: "3 хв", text: "до садочка та школи" },
+      { time: "5 хв", text: "до супермаркету" },
+      { time: "8 хв", text: "до залізничної станції" },
+      { time: "15 хв", text: "до Києва" },
+    ],
+  },
+  contactCta: {
+    badge: "Записатись",
+    title: "Розправ крила\nвдома",
+    description:
+      "Залиште контакт — менеджер зателефонує впродовж 15 хвилин у робочий час, розрахує умови та запросить на огляд котеджного містечка.",
+    image: siteAsset("images/contact-720.webp"),
+  },
+};
+
+export function mergeSections(
+  defaults: SiteSections,
+  saved?: Partial<SiteSections> | null,
+): SiteSections {
+  if (!saved) return defaults;
+  return {
+    marquee:
+      Array.isArray(saved.marquee) && saved.marquee.length > 0 ? saved.marquee : defaults.marquee,
+    about: {
+      ...defaults.about,
+      ...(saved.about || {}),
+      items:
+        Array.isArray(saved.about?.items) && saved.about.items.length > 0
+          ? saved.about.items
+          : defaults.about.items,
+    },
+    masterplan: {
+      ...defaults.masterplan,
+      ...(saved.masterplan || {}),
+      points:
+        Array.isArray(saved.masterplan?.points) && saved.masterplan.points.length > 0
+          ? saved.masterplan.points
+          : defaults.masterplan.points,
+    },
+    financing: {
+      ...defaults.financing,
+      ...(saved.financing || {}),
+      programs:
+        Array.isArray(saved.financing?.programs) && saved.financing.programs.length > 0
+          ? saved.financing.programs
+          : defaults.financing.programs,
+    },
+    location: {
+      ...defaults.location,
+      ...(saved.location || {}),
+      points:
+        Array.isArray(saved.location?.points) && saved.location.points.length > 0
+          ? saved.location.points
+          : defaults.location.points,
+    },
+    contactCta: {
+      ...defaults.contactCta,
+      ...(saved.contactCta || {}),
+    },
+  };
+}
+
 export const DEFAULT_SITE_SETTINGS: SiteSettings = {
   scrollMediaVideoUrl: siteAsset("videos/hero-web.mp4"),
+  sections: DEFAULT_SITE_SECTIONS,
 };
 
 const CONTACTS_STORAGE_KEY = "wb_site_contacts";
@@ -217,7 +436,10 @@ export function writeConstructionUpdates(updates: ConstructionUpdate[]) {
 export function readSiteSettings(): SiteSettings {
   if (typeof window === "undefined") return DEFAULT_SITE_SETTINGS;
   const settings = safeParse<Partial<SiteSettings>>(localStorage.getItem(SETTINGS_STORAGE_KEY), {});
-  return { ...DEFAULT_SITE_SETTINGS, ...settings };
+  return {
+    scrollMediaVideoUrl: settings.scrollMediaVideoUrl ?? DEFAULT_SITE_SETTINGS.scrollMediaVideoUrl,
+    sections: mergeSections(DEFAULT_SITE_SECTIONS, settings.sections),
+  };
 }
 
 export function writeSiteSettings(settings: SiteSettings) {
