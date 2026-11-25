@@ -32,6 +32,7 @@ import {
   PRICE_UAH_RATE,
   readCustomHouses,
   readHouseTypes,
+  removeHouseType,
   readHouseOverrides,
   resetHouseOverrides,
   writeCustomHouses,
@@ -70,6 +71,7 @@ import {
   checkAdminAuthFn,
   deleteConstructionUpdateFn,
   deleteHouseFn,
+  deleteHouseTypeFn,
   deleteSiteDocumentFn,
   listHousesFn,
   listHouseTypesFn,
@@ -342,6 +344,7 @@ function HousesAdmin({ onNotice }: { onNotice: (message: string) => void }) {
   const saveHouseServer = useServerFn(saveHouseFn);
   const deleteHouseServer = useServerFn(deleteHouseFn);
   const saveHouseTypeServer = useServerFn(saveHouseTypeFn);
+  const deleteHouseTypeServer = useServerFn(deleteHouseTypeFn);
   const uploadAdminImageServer = useServerFn(uploadAdminImageFn);
   const uploadAdminFileServer = useServerFn(uploadAdminFileFn);
   const [houses, setHouses] = useState<House[]>(() => getHouses());
@@ -445,7 +448,8 @@ function HousesAdmin({ onNotice }: { onNotice: (message: string) => void }) {
   }
 
   async function deleteHouse() {
-    if (!draft || defaultIds.has(draft.id)) return;
+    if (!draft) return;
+    if (!window.confirm(`Видалити "${draft.name}"? Цю дію не можна скасувати.`)) return;
     try {
       await deleteHouseServer({ data: { id: draft.id } });
       const next = await listHousesServer();
@@ -584,6 +588,28 @@ function HousesAdmin({ onNotice }: { onNotice: (message: string) => void }) {
     setDraft({ ...draft, unitPlans: draft.unitPlans.filter((_, i) => i !== index) });
   }
 
+  async function deleteType(type: HouseType) {
+    const usedBy = houses.filter((house) => house.type === type.id);
+    if (usedBy.length > 0) {
+      onNotice(
+        `Тип "${type.label}" використовується в будинках (${usedBy.length}). Спочатку змініть їм тип.`,
+      );
+      return;
+    }
+    if (!window.confirm(`Видалити тип "${type.label}"?`)) return;
+    const fallbackType = houseTypes.find((item) => item.id !== type.id)?.id ?? "";
+    if (draft?.type === type.id) setDraft({ ...draft, type: fallbackType });
+    try {
+      await deleteHouseTypeServer({ data: { id: type.id } });
+      setHouseTypes(await listHouseTypesServer());
+      onNotice(`Тип "${type.label}" видалено.`);
+    } catch {
+      removeHouseType(type.id);
+      setHouseTypes(readHouseTypes());
+      onNotice(`Тип "${type.label}" видалено локально.`);
+    }
+  }
+
   function resetAll() {
     resetHouseOverrides();
     const next = getHouses();
@@ -669,14 +695,14 @@ function HousesAdmin({ onNotice }: { onNotice: (message: string) => void }) {
             </div>
             <h2 className="text-2xl font-bold">{draft.name}</h2>
           </div>
-          <button
-            onClick={saveHouse}
-            className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
-          >
-            <Save className="h-4 w-4" />
-            Зберегти
-          </button>
-          {!defaultIds.has(draft.id) && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={saveHouse}
+              className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+            >
+              <Save className="h-4 w-4" />
+              Зберегти
+            </button>
             <button
               onClick={deleteHouse}
               className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold text-destructive hover:border-destructive"
@@ -684,26 +710,40 @@ function HousesAdmin({ onNotice }: { onNotice: (message: string) => void }) {
               <Trash2 className="h-4 w-4" />
               Видалити
             </button>
-          )}
+          </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <label className="grid gap-1.5">
+          <div className="grid min-w-0 gap-1.5">
             <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Тип
             </span>
-            <select
-              value={draft.type}
-              onChange={(event) => setDraft({ ...draft, type: event.target.value })}
-              className="h-10 rounded-md border border-input bg-background px-3 text-sm outline-none focus:border-primary"
-            >
-              {houseTypes.map((type) => (
-                <option key={type.id} value={type.id}>
-                  {type.label}
-                </option>
-              ))}
-            </select>
-          </label>
+            <div className="flex min-w-0 gap-2">
+              <select
+                value={draft.type}
+                onChange={(event) => setDraft({ ...draft, type: event.target.value })}
+                className="h-10 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm outline-none focus:border-primary"
+              >
+                {houseTypes.map((type) => (
+                  <option key={type.id} value={type.id}>
+                    {type.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => {
+                  const current = houseTypes.find((type) => type.id === draft.type);
+                  if (current) void deleteType(current);
+                }}
+                aria-label="Видалити цей тип"
+                title="Видалити обраний тип"
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-border text-destructive hover:border-destructive"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
           <TextField
             label="Назва"
             value={draft.name}
@@ -1084,6 +1124,24 @@ function ContactsAdmin({ onNotice }: { onNotice: (message: string) => void }) {
           value={contacts.whatsappUrl}
           onChange={(value) => setContacts({ ...contacts, whatsappUrl: value })}
         />
+        <TextField
+          label="Instagram URL"
+          value={contacts.instagramUrl}
+          onChange={(value) => setContacts({ ...contacts, instagramUrl: value })}
+        />
+        <TextField
+          label="Facebook URL"
+          value={contacts.facebookUrl}
+          onChange={(value) => setContacts({ ...contacts, facebookUrl: value })}
+        />
+        <TextField
+          label="TikTok URL"
+          value={contacts.tiktokUrl}
+          onChange={(value) => setContacts({ ...contacts, tiktokUrl: value })}
+        />
+        <p className="text-xs text-muted-foreground md:col-span-2">
+          Порожнє поле на сайті не показується: достатньо стерти значення й зберегти.
+        </p>
       </div>
     </section>
   );
@@ -1112,8 +1170,8 @@ function SectionsAdmin({ onNotice }: { onNotice: (message: string) => void }) {
     () => settings.sections ?? DEFAULT_SITE_SECTIONS,
   );
   const [subTab, setSubTab] = useState<
-    "about" | "marquee" | "masterplan" | "financing" | "location" | "contactCta"
-  >("about");
+    "hero" | "about" | "marquee" | "masterplan" | "financing" | "location" | "contactCta" | "footer"
+  >("hero");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -1175,20 +1233,39 @@ function SectionsAdmin({ onNotice }: { onNotice: (message: string) => void }) {
     onNotice("Секції скинуто. Натисніть «Зберегти», щоб зафіксувати.");
   }
 
+  function setHero(patch: Partial<SiteSections["hero"]>) {
+    setSections((prev) => ({ ...prev, hero: { ...prev.hero, ...patch } }));
+  }
+
+  function setFooter(patch: Partial<SiteSections["footer"]>) {
+    setSections((prev) => ({ ...prev, footer: { ...prev.footer, ...patch } }));
+  }
+
+  const heroStats = [0, 1, 2].map(
+    (index) => sections.hero.stats[index] ?? { value: "", label: "" },
+  );
+
+  function setHeroStat(index: number, patch: Partial<{ value: string; label: string }>) {
+    const next = heroStats.map((stat, i) => (i === index ? { ...stat, ...patch } : stat));
+    setHero({ stats: next });
+  }
+
   const subTabs = [
+    { id: "hero", label: "Головний екран (Hero)" },
     { id: "about", label: "Про містечко" },
     { id: "marquee", label: "Рядок переваг (Тікер)" },
     { id: "masterplan", label: "Генплан" },
     { id: "financing", label: "Умови придбання / єОселя" },
     { id: "location", label: "Локація" },
     { id: "contactCta", label: "Блок запису (CTA)" },
+    { id: "footer", label: "Підвал (Footer)" },
   ] as const;
 
   return (
     <section className="rounded-lg border border-border bg-background p-5 shadow-card">
       <AdminSectionHeader
         title="Секції сайту"
-        description="Редагування наповнення сайту (тексти, фото, списки, програми). Головний екран Hero залишається фіксованим."
+        description="Редагування наповнення сайту: тексти, фото, списки, програми. Порожнє поле на сайті не показується."
       >
         <button
           onClick={reset}
@@ -1225,6 +1302,148 @@ function SectionsAdmin({ onNotice }: { onNotice: (message: string) => void }) {
       </div>
 
       <div className="mt-6">
+        {/* HERO */}
+        {subTab === "hero" && (
+          <div className="grid gap-6">
+            <div className="rounded-lg border border-border/80 bg-secondary/20 p-4 text-xs text-muted-foreground">
+              💡 У заголовку й описі частину тексту між зірочками буде виділено: «Дім серед
+              *сосен,*». Новий рядок у заголовку починає наступний рядок. Відео для Hero додається у
+              вкладці «Медіа». Кількість доступних і ціна «від» рахуються автоматично за будинками.
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-3">
+              <TextField
+                label="Верхній рядок, зліва"
+                value={sections.hero.topLeft}
+                onChange={(val) => setHero({ topLeft: val })}
+              />
+              <TextField
+                label="Верхній рядок, статус"
+                value={sections.hero.topStatus}
+                onChange={(val) => setHero({ topStatus: val })}
+              />
+              <TextField
+                label="Верхній рядок, дата"
+                value={sections.hero.topDate}
+                onChange={(val) => setHero({ topDate: val })}
+              />
+            </div>
+
+            <TextField
+              label="Надзаголовок"
+              value={sections.hero.eyebrow}
+              onChange={(val) => setHero({ eyebrow: val })}
+            />
+            <TextAreaField
+              label="Головний заголовок"
+              rows={2}
+              value={sections.hero.title}
+              onChange={(val) => setHero({ title: val })}
+            />
+            <TextAreaField
+              label="Опис"
+              rows={3}
+              value={sections.hero.description}
+              onChange={(val) => setHero({ description: val })}
+            />
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <TextField
+                label="Кнопка 1 (веде до будинків)"
+                value={sections.hero.primaryButton}
+                onChange={(val) => setHero({ primaryButton: val })}
+              />
+              <TextField
+                label="Кнопка 2 (веде до форми)"
+                value={sections.hero.secondaryButton}
+                onChange={(val) => setHero({ secondaryButton: val })}
+              />
+            </div>
+
+            <div className="grid gap-3">
+              <h3 className="text-sm font-bold">Цифри під кнопками (до трьох)</h3>
+              {heroStats.map((stat, index) => (
+                <div key={index} className="grid gap-3 md:grid-cols-[1fr_2fr]">
+                  <TextField
+                    label={`Цифра ${index + 1}`}
+                    value={stat.value}
+                    onChange={(val) => setHeroStat(index, { value: val })}
+                  />
+                  <TextField
+                    label="Підпис"
+                    value={stat.label}
+                    onChange={(val) => setHeroStat(index, { label: val })}
+                  />
+                </div>
+              ))}
+            </div>
+
+            <ImageUploadField
+              label="Фото в арці (порожньо = стандартне)"
+              value={sections.hero.image}
+              onChange={(val) => setHero({ image: val })}
+              onFile={(file) => handleUpload(file, (url) => setHero({ image: url }), "hero")}
+            />
+
+            <div className="grid gap-3 rounded-lg border border-border p-4">
+              <h3 className="text-sm font-bold">Картка «Доступно»</h3>
+              <div className="grid gap-4 md:grid-cols-2">
+                <TextField
+                  label="Назва картки (порожньо = сховати картку)"
+                  value={sections.hero.availableLabel}
+                  onChange={(val) => setHero({ availableLabel: val })}
+                />
+                <TextField
+                  label="Підпис біля числа"
+                  value={sections.hero.availableUnit}
+                  onChange={(val) => setHero({ availableUnit: val })}
+                />
+                <NumberField
+                  label="Крапок усього (0 = без крапок)"
+                  value={sections.hero.progressTotal}
+                  onChange={(val) => setHero({ progressTotal: val })}
+                />
+                <NumberField
+                  label="З них заповнених"
+                  value={sections.hero.progressFilled}
+                  onChange={(val) => setHero({ progressFilled: val })}
+                />
+              </div>
+              <TextField
+                label="Підпис під крапками"
+                value={sections.hero.progressCaption}
+                onChange={(val) => setHero({ progressCaption: val })}
+              />
+            </div>
+
+            <div className="grid gap-3 rounded-lg border border-border p-4">
+              <h3 className="text-sm font-bold">Картка «Ціна»</h3>
+              <div className="grid gap-4 md:grid-cols-2">
+                <TextField
+                  label="Назва картки (порожньо = сховати картку)"
+                  value={sections.hero.priceLabel}
+                  onChange={(val) => setHero({ priceLabel: val })}
+                />
+                <TextField
+                  label="Слово справа від назви"
+                  value={sections.hero.priceFrom}
+                  onChange={(val) => setHero({ priceFrom: val })}
+                />
+                <TextField
+                  label="Рядок кредиту, підпис"
+                  value={sections.hero.creditLabel}
+                  onChange={(val) => setHero({ creditLabel: val })}
+                />
+                <TextField
+                  label="Рядок кредиту, значок"
+                  value={sections.hero.creditBadge}
+                  onChange={(val) => setHero({ creditBadge: val })}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ABOUT */}
         {subTab === "about" && (
           <div className="grid gap-6">
@@ -1884,6 +2103,43 @@ function SectionsAdmin({ onNotice }: { onNotice: (message: string) => void }) {
             </div>
           </div>
         )}
+
+        {/* FOOTER */}
+        {subTab === "footer" && (
+          <div className="grid gap-6">
+            <TextAreaField
+              label="Короткий опис під логотипом"
+              rows={3}
+              value={sections.footer.about}
+              onChange={(val) => setFooter({ about: val })}
+            />
+            <div className="grid gap-4 md:grid-cols-2">
+              <TextField
+                label="Заголовок блоку з реквізитами"
+                value={sections.footer.developerTitle}
+                onChange={(val) => setFooter({ developerTitle: val })}
+              />
+              <TextField
+                label="Забудовник / реквізити (порожньо = сховати блок)"
+                value={sections.footer.developerName}
+                onChange={(val) => setFooter({ developerName: val })}
+              />
+              <TextField
+                label="Текст після © і року"
+                value={sections.footer.copyright}
+                onChange={(val) => setFooter({ copyright: val })}
+              />
+              <TextField
+                label="Рядок справа внизу"
+                value={sections.footer.tagline}
+                onChange={(val) => setFooter({ tagline: val })}
+              />
+            </div>
+            <div className="rounded-lg border border-border/80 bg-secondary/20 p-4 text-xs text-muted-foreground">
+              💡 Контакти й соцмережі в підвалі беруться з вкладки «Контакти».
+            </div>
+          </div>
+        )}
       </div>
     </section>
   );
@@ -2245,7 +2501,7 @@ function MediaAdmin({ onNotice }: { onNotice: (message: string) => void }) {
     };
   }, [readSettingsServer]);
 
-  async function uploadVideo(file: File) {
+  async function uploadVideo(file: File, field: "scrollMediaVideoUrl" | "heroVideoUrl") {
     if (!file.type.startsWith("video/")) {
       onNotice("Оберіть відеофайл.");
       return;
@@ -2254,7 +2510,7 @@ function MediaAdmin({ onNotice }: { onNotice: (message: string) => void }) {
       const formData = new FormData();
       formData.append("file", file);
       const uploaded = await uploadFileServer({ data: formData });
-      setSettings({ ...settings, scrollMediaVideoUrl: uploaded.url });
+      setSettings((current) => ({ ...current, [field]: uploaded.url }));
       onNotice("Відео додано. Натисніть зберегти.");
     } catch {
       onNotice("Не вдалося завантажити відео. Можна вставити URL вручну.");
@@ -2284,7 +2540,8 @@ function MediaAdmin({ onNotice }: { onNotice: (message: string) => void }) {
         <div>
           <h2 className="text-lg font-bold">Медіа</h2>
           <p className="text-sm text-muted-foreground">
-            Відео для другого анімованого блоку. Якщо URL пустий, сайт показує поточне фото.
+            Відео для головного екрана (Hero) і для другого анімованого блоку. Якщо відео немає,
+            сайт показує фото.
           </p>
         </div>
         <div className="flex gap-2">
@@ -2304,20 +2561,56 @@ function MediaAdmin({ onNotice }: { onNotice: (message: string) => void }) {
           </button>
         </div>
       </div>
-      <FileUploadField
-        label="Відеозаставка"
-        value={settings.scrollMediaVideoUrl}
-        accept="video/mp4,video/webm,video/quicktime"
-        onChange={(value) => setSettings({ ...settings, scrollMediaVideoUrl: value })}
-        onFile={uploadVideo}
-      />
-      {settings.scrollMediaVideoUrl && (
-        <video
-          src={settings.scrollMediaVideoUrl}
-          className="mt-4 aspect-video w-full rounded-lg bg-secondary object-cover"
-          controls
-        />
-      )}
+      <div className="grid gap-8">
+        <div>
+          <FileUploadField
+            label="Відео головного екрана (Hero)"
+            value={settings.heroVideoUrl}
+            accept="video/mp4,video/webm,video/quicktime"
+            onChange={(value) => setSettings({ ...settings, heroVideoUrl: value })}
+            onFile={(file) => uploadVideo(file, "heroVideoUrl")}
+          />
+          <p className="mt-2 text-xs text-muted-foreground">
+            Відтворюється замість фото в арці, без звуку й по колу, паралакс при скролі
+            зберігається. Порожнє поле означає, що показується фото. Потрібен прямий файл MP4 або
+            WebM, бажано до 10 МБ та вертикального формату 4:5. Посилання Google Drive і YouTube не
+            працюють.
+          </p>
+          {settings.heroVideoUrl && /drive\.google\.|youtu\.?be/i.test(settings.heroVideoUrl) && (
+            <p className="mt-2 text-xs font-semibold text-destructive">
+              Це посилання на сторінку перегляду, а не на відеофайл, воно не відтворюється.
+              Завантажте файл або вставте пряме посилання на .mp4.
+            </p>
+          )}
+          {settings.heroVideoUrl && (
+            <video
+              key={settings.heroVideoUrl}
+              src={settings.heroVideoUrl}
+              className="mt-4 aspect-[4/5] max-h-[420px] rounded-lg bg-secondary object-cover"
+              controls
+              muted
+              playsInline
+            />
+          )}
+        </div>
+
+        <div>
+          <FileUploadField
+            label="Відеозаставка (другий блок)"
+            value={settings.scrollMediaVideoUrl}
+            accept="video/mp4,video/webm,video/quicktime"
+            onChange={(value) => setSettings({ ...settings, scrollMediaVideoUrl: value })}
+            onFile={(file) => uploadVideo(file, "scrollMediaVideoUrl")}
+          />
+          {settings.scrollMediaVideoUrl && (
+            <video
+              src={settings.scrollMediaVideoUrl}
+              className="mt-4 aspect-video w-full rounded-lg bg-secondary object-cover"
+              controls
+            />
+          )}
+        </div>
+      </div>
     </section>
   );
 }

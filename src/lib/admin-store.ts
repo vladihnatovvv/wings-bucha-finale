@@ -19,6 +19,9 @@ export type SiteContacts = {
   email: string;
   telegramUrl: string;
   whatsappUrl: string;
+  facebookUrl: string;
+  instagramUrl: string;
+  tiktokUrl: string;
   address: string;
 };
 
@@ -58,7 +61,49 @@ export type LocationPointItem = {
   text: string;
 };
 
+export type HeroStatItem = {
+  value: string;
+  label: string;
+};
+
+/**
+ * Text fields support *emphasis*: the part between asterisks is highlighted.
+ * An empty text field hides that element on the site.
+ */
+export type HeroSection = {
+  topLeft: string;
+  topStatus: string;
+  topDate: string;
+  eyebrow: string;
+  title: string;
+  description: string;
+  primaryButton: string;
+  secondaryButton: string;
+  stats: HeroStatItem[];
+  /** Replaces the hero photo when set. */
+  image: string;
+  availableLabel: string;
+  availableUnit: string;
+  progressTotal: number;
+  progressFilled: number;
+  progressCaption: string;
+  priceLabel: string;
+  priceFrom: string;
+  creditLabel: string;
+  creditBadge: string;
+};
+
+export type FooterSection = {
+  about: string;
+  developerTitle: string;
+  developerName: string;
+  copyright: string;
+  tagline: string;
+};
+
 export type SiteSections = {
+  hero: HeroSection;
+  footer: FooterSection;
   marquee: string[];
   about: {
     eyebrow: string;
@@ -98,16 +143,22 @@ export type SiteSections = {
 
 export type SiteSettings = {
   scrollMediaVideoUrl: string;
+  /** Video for the main hero screen. Empty means the hero photo is shown. */
+  heroVideoUrl: string;
   sections?: SiteSections;
 };
 
+// Contacts are filled in by the owner in the admin panel. An empty value is simply not shown.
 export const DEFAULT_CONTACTS: SiteContacts = {
-  phoneDisplay: "+38 (000) 000-00-00",
-  phoneHref: "+380000000000",
-  email: "info@wingsbucha.com",
-  telegramUrl: "https://t.me/wingsbucha",
-  whatsappUrl: "https://wa.me/380000000000",
-  address: "м. Буча, вул. Лісова, 28",
+  phoneDisplay: "",
+  phoneHref: "",
+  email: "",
+  telegramUrl: "",
+  whatsappUrl: "",
+  facebookUrl: "",
+  instagramUrl: "",
+  tiktokUrl: "",
+  address: "",
 };
 
 export const DEFAULT_DOCUMENTS: SiteDocument[] = [
@@ -172,6 +223,40 @@ export const DEFAULT_CONSTRUCTION_UPDATES: ConstructionUpdate[] = [
 ];
 
 export const DEFAULT_SITE_SECTIONS: SiteSections = {
+  hero: {
+    topLeft: "Котеджне містечко — Буча · Лісова 28",
+    topStatus: "Старт продажів · І черга",
+    topDate: "",
+    eyebrow: "Преміальний еко-квартал",
+    title: "Дім серед *сосен,*\nполіт *без меж.*",
+    description:
+      "Камерний квартал на 7 гектарах сосен у Бучі. Архітектура з природного каменю та дерева, повна газифікація, закрита територія. Кредит за *єОселя 3%*.",
+    primaryButton: "Обрати резиденцію",
+    secondaryButton: "Запросити приватний показ",
+    stats: [
+      { value: "єОселя", label: "акредитований забудовник" },
+      { value: "15 хв", label: "до центру Києва" },
+      { value: "7 га", label: "соснового лісу" },
+    ],
+    image: "",
+    availableLabel: "Доступно у І черзі",
+    availableUnit: "резиденцій",
+    progressTotal: 0,
+    progressFilled: 0,
+    progressCaption: "",
+    priceLabel: "Стартова ціна",
+    priceFrom: "від",
+    creditLabel: "Кредит від",
+    creditBadge: "3% єОселя",
+  },
+  footer: {
+    about:
+      "Сучасне котеджне містечко серед лісу, у 15 хвилинах від Києва. Дім, де народжуються крила.",
+    developerTitle: "Забудовник",
+    developerName: "ТОВ «Крила Бучі Девелопмент»",
+    copyright: "Wings Bucha. Усі права захищені.",
+    tagline: "Світла, мінімалістична та природна архітектура",
+  },
   marquee: [
     "Преміальне котеджне містечко",
     "єОселя 3% / 7%",
@@ -291,6 +376,16 @@ export function mergeSections(
 ): SiteSections {
   if (!saved) return defaults;
   return {
+    hero: {
+      ...defaults.hero,
+      ...(saved.hero || {}),
+      // An empty list is a valid choice (hides the statistics), so only a missing one falls back.
+      stats: Array.isArray(saved.hero?.stats) ? saved.hero.stats : defaults.hero.stats,
+    },
+    footer: {
+      ...defaults.footer,
+      ...(saved.footer || {}),
+    },
     marquee:
       Array.isArray(saved.marquee) && saved.marquee.length > 0 ? saved.marquee : defaults.marquee,
     about: {
@@ -334,6 +429,7 @@ export function mergeSections(
 
 export const DEFAULT_SITE_SETTINGS: SiteSettings = {
   scrollMediaVideoUrl: siteAsset("videos/hero-web.mp4"),
+  heroVideoUrl: "",
   sections: DEFAULT_SITE_SECTIONS,
 };
 
@@ -438,6 +534,7 @@ export function readSiteSettings(): SiteSettings {
   const settings = safeParse<Partial<SiteSettings>>(localStorage.getItem(SETTINGS_STORAGE_KEY), {});
   return {
     scrollMediaVideoUrl: settings.scrollMediaVideoUrl ?? DEFAULT_SITE_SETTINGS.scrollMediaVideoUrl,
+    heroVideoUrl: settings.heroVideoUrl ?? "",
     sections: mergeSections(DEFAULT_SITE_SECTIONS, settings.sections),
   };
 }

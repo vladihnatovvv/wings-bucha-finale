@@ -1,29 +1,14 @@
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { addLead } from "@/lib/admin-store";
-import { readHouseTypes } from "@/lib/houses";
-import { createLeadFn, listHouseTypesFn } from "@/lib/content.functions";
+import { createLeadFn } from "@/lib/content.functions";
+import { useSiteContent } from "@/lib/site-content";
 
 export function ContactForm() {
   const createLeadServer = useServerFn(createLeadFn);
-  const listHouseTypesServer = useServerFn(listHouseTypesFn);
   const [loading, setLoading] = useState(false);
-  const [houseTypes, setHouseTypes] = useState(() => readHouseTypes());
+  const { houseTypes } = useSiteContent();
   const [notice, setNotice] = useState<{ type: "error" | "success"; text: string } | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    listHouseTypesServer()
-      .then((types) => {
-        if (alive) setHouseTypes(types);
-      })
-      .catch(() => {
-        if (alive) setHouseTypes(readHouseTypes());
-      });
-    return () => {
-      alive = false;
-    };
-  }, [listHouseTypesServer]);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();

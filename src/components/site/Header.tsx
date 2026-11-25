@@ -1,10 +1,9 @@
 import { Link } from "@tanstack/react-router";
-import { useServerFn } from "@tanstack/react-start";
 import { Phone, Menu, X } from "lucide-react";
-import { useEffect, useState } from "react";
-import { DEFAULT_CONTACTS, readSiteContacts } from "@/lib/admin-store";
-import { readSiteContactsFn } from "@/lib/content.functions";
+import { useState } from "react";
+import { useSiteContent } from "@/lib/site-content";
 import { siteAsset } from "@/lib/assets";
+import { hasValue } from "@/components/site/SocialLinks";
 
 const logo = siteAsset("images/logo-wings.webp");
 
@@ -18,23 +17,12 @@ const nav = [
 ];
 
 export function Header() {
-  const readSiteContactsServer = useServerFn(readSiteContactsFn);
+  const { contacts, houses, documents } = useSiteContent();
   const [open, setOpen] = useState(false);
-  const [contacts, setContacts] = useState(DEFAULT_CONTACTS);
-
-  useEffect(() => {
-    let alive = true;
-    readSiteContactsServer()
-      .then((serverContacts) => {
-        if (alive) setContacts(serverContacts);
-      })
-      .catch(() => {
-        if (alive) setContacts(readSiteContacts());
-      });
-    return () => {
-      alive = false;
-    };
-  }, [readSiteContactsServer]);
+  // Anchors of empty sections are not shown.
+  const visibleNav = nav.filter(
+    (n) => (n.to !== "#houses" || houses.length > 0) && (n.to !== "#docs" || documents.length > 0),
+  );
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/85 backdrop-blur-md">
@@ -56,7 +44,7 @@ export function Header() {
         </Link>
 
         <nav className="hidden items-center gap-7 lg:flex">
-          {nav.map((n) => (
+          {visibleNav.map((n) => (
             <a
               key={n.to}
               href={n.to}
@@ -68,12 +56,19 @@ export function Header() {
         </nav>
 
         <div className="hidden items-center gap-3 md:flex">
-          <a
-            href={`tel:${contacts.phoneHref}`}
-            className="flex items-center gap-2 text-sm font-semibold text-foreground hover:text-primary"
-          >
-            <Phone className="h-4 w-4" /> {contacts.phoneDisplay}
-          </a>
+          {hasValue(contacts.phoneDisplay) &&
+            (hasValue(contacts.phoneHref) ? (
+              <a
+                href={`tel:${contacts.phoneHref}`}
+                className="flex items-center gap-2 text-sm font-semibold text-foreground hover:text-primary"
+              >
+                <Phone className="h-4 w-4" /> {contacts.phoneDisplay}
+              </a>
+            ) : (
+              <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <Phone className="h-4 w-4" /> {contacts.phoneDisplay}
+              </span>
+            ))}
           <a
             href="#contact"
             className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-soft transition-transform hover:scale-[1.02]"
@@ -90,7 +85,7 @@ export function Header() {
       {open && (
         <div className="border-t border-border bg-background lg:hidden">
           <div className="container-x flex flex-col gap-1 py-4">
-            {nav.map((n) => (
+            {visibleNav.map((n) => (
               <a
                 key={n.to}
                 href={n.to}

@@ -1,5 +1,4 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { ArrowLeft, ArrowRight, Plus, Scale, X } from "lucide-react";
@@ -12,12 +11,11 @@ import {
   fmtUahAmount,
   fmtUsd,
   getHousePriceUah,
-  getHouses,
   readCompare,
   writeCompare,
   type House,
 } from "@/lib/houses";
-import { listHousesFn } from "@/lib/content.functions";
+import { useSiteContent } from "@/lib/site-content";
 
 export const Route = createFileRoute("/compare")({
   head: () => ({
@@ -50,30 +48,14 @@ const ROWS: { label: string; get: (h: House) => string }[] = [
 ];
 
 function ComparePage() {
-  const listHousesServer = useServerFn(listHousesFn);
+  const { houses: allHouses } = useSiteContent();
   const [ids, setIds] = useState<string[]>([]);
-  const [allHouses, setAllHouses] = useState<House[]>(() => getHouses());
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    let alive = true;
-    listHousesServer()
-      .then((houses) => {
-        if (!alive) return;
-        setAllHouses(houses);
-        setIds(readCompare());
-        setHydrated(true);
-      })
-      .catch(() => {
-        if (!alive) return;
-        setAllHouses(getHouses());
-        setIds(readCompare());
-        setHydrated(true);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [listHousesServer]);
+    setIds(readCompare().filter((id) => allHouses.some((house) => house.id === id)));
+    setHydrated(true);
+  }, [allHouses]);
 
   useEffect(() => {
     if (hydrated) writeCompare(ids);

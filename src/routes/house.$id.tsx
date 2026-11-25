@@ -1,5 +1,4 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -21,18 +20,16 @@ import { Toaster } from "@/components/ui/sonner";
 import {
   fmtHousePrice,
   fmtHouseSecondaryPrice,
-  getHouse,
-  getHouses,
-  getHouseTypeLabel,
   getUnitStatusLabel,
   type House,
   type UnitStatus,
 } from "@/lib/houses";
-import { getHouseByIdFn, listHousesFn } from "@/lib/content.functions";
+import { getHouseByIdFn } from "@/lib/content.functions";
+import { houseTypeLabel, useSiteContent } from "@/lib/site-content";
 
 export const Route = createFileRoute("/house/$id")({
   loader: async ({ params }): Promise<{ house: House }> => {
-    const house = (await getHouseByIdFn({ data: { id: params.id } })) ?? getHouse(params.id);
+    const house = await getHouseByIdFn({ data: { id: params.id } });
     if (!house) throw notFound();
     return { house };
   },
@@ -82,45 +79,14 @@ export const Route = createFileRoute("/house/$id")({
 type Tab = "facade" | "video" | "floor" | "unit";
 
 function HousePage() {
-  const getHouseByIdServer = useServerFn(getHouseByIdFn);
-  const listHousesServer = useServerFn(listHousesFn);
-  const { house: loaderHouse } = Route.useLoaderData() as { house: House };
-  const [house, setHouse] = useState(loaderHouse);
-  const [others, setOthers] = useState(() =>
-    getHouses()
-      .filter((h) => h.id !== loaderHouse.id)
-      .slice(0, 3),
-  );
+  const { house } = Route.useLoaderData() as { house: House };
+  const { houses, houseTypes } = useSiteContent();
+  const others = houses.filter((h) => h.id !== house.id).slice(0, 3);
   const [tab, setTab] = useState<Tab>("facade");
   const [floorIdx, setFloorIdx] = useState(0);
   const [unitIdx, setUnitIdx] = useState(0);
 
-  const typeLabel = getHouseTypeLabel(house.type);
-
-  useEffect(() => {
-    setHouse(loaderHouse);
-  }, [loaderHouse]);
-
-  useEffect(() => {
-    let alive = true;
-    Promise.all([getHouseByIdServer({ data: { id: loaderHouse.id } }), listHousesServer()])
-      .then(([serverHouse, houses]) => {
-        if (!alive) return;
-        if (serverHouse) setHouse(serverHouse);
-        setOthers(houses.filter((h) => h.id !== loaderHouse.id).slice(0, 3));
-      })
-      .catch(() => {
-        if (!alive) return;
-        setOthers(
-          getHouses()
-            .filter((h) => h.id !== loaderHouse.id)
-            .slice(0, 3),
-        );
-      });
-    return () => {
-      alive = false;
-    };
-  }, [getHouseByIdServer, listHousesServer, loaderHouse.id]);
+  const typeLabel = houseTypeLabel(houseTypes, house.type);
 
   return (
     <div className="min-h-screen bg-background">

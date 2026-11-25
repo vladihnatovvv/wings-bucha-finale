@@ -9,6 +9,7 @@ import {
 } from "@tanstack/react-router";
 
 import appCss from "../styles.css?url";
+import { readPublicContentFn } from "@/lib/content.functions";
 
 const META_PIXEL_ID = "1058761913721264";
 const TIKTOK_PIXEL_ID = "DAF8JE3C77UDHLL3L250";
@@ -113,6 +114,10 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
+  // One request for all public content. It is rendered on the server and then reused in the
+  // browser for 5 minutes, so Header, Footer, houses, documents, etc. do not refetch it.
+  loader: () => readPublicContentFn(),
+  staleTime: 5 * 60_000,
   head: () => ({
     meta: [
       { charSet: "utf-8" },

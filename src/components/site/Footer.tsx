@@ -1,28 +1,13 @@
-import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useState } from "react";
-import { DEFAULT_CONTACTS, readSiteContacts } from "@/lib/admin-store";
-import { readSiteContactsFn } from "@/lib/content.functions";
+import { DEFAULT_SITE_SECTIONS } from "@/lib/admin-store";
+import { useSiteContent } from "@/lib/site-content";
+import { SocialLinks, getSocialLinks, hasValue } from "@/components/site/SocialLinks";
 import { siteAsset } from "@/lib/assets";
 
 const logo = siteAsset("images/logo-wings.webp");
 
 export function Footer() {
-  const readSiteContactsServer = useServerFn(readSiteContactsFn);
-  const [contacts, setContacts] = useState(DEFAULT_CONTACTS);
-
-  useEffect(() => {
-    let alive = true;
-    readSiteContactsServer()
-      .then((serverContacts) => {
-        if (alive) setContacts(serverContacts);
-      })
-      .catch(() => {
-        if (alive) setContacts(readSiteContacts());
-      });
-    return () => {
-      alive = false;
-    };
-  }, [readSiteContactsServer]);
+  const { contacts, settings } = useSiteContent();
+  const footer = (settings.sections ?? DEFAULT_SITE_SECTIONS).footer;
 
   return (
     <footer className="border-t border-border bg-secondary/50">
@@ -38,39 +23,65 @@ export function Footer() {
                 </div>
               </div>
             </div>
-            <p className="mt-5 max-w-md text-sm leading-relaxed text-muted-foreground">
-              Сучасне котеджне містечко серед лісу, у 15 хвилинах від Києва. Дім, де народжуються
-              крила.
-            </p>
+            {hasValue(footer.about) && (
+              <p className="mt-5 max-w-md text-sm leading-relaxed text-muted-foreground">
+                {footer.about}
+              </p>
+            )}
           </div>
 
-          <div>
-            <h4 className="text-sm font-semibold">Контакти</h4>
-            <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
-              <li>
-                <a href={`tel:${contacts.phoneHref}`} className="hover:text-primary">
-                  {contacts.phoneDisplay}
-                </a>
-              </li>
-              <li>
-                <a href={`mailto:${contacts.email}`} className="hover:text-primary">
-                  {contacts.email}
-                </a>
-              </li>
-              <li>{contacts.address}</li>
-            </ul>
-          </div>
+          {(hasValue(contacts.phoneDisplay) ||
+            hasValue(contacts.email) ||
+            hasValue(contacts.address) ||
+            getSocialLinks(contacts).length > 0) && (
+            <div>
+              <h4 className="text-sm font-semibold">Контакти</h4>
+              <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
+                {hasValue(contacts.phoneDisplay) && (
+                  <li>
+                    {hasValue(contacts.phoneHref) ? (
+                      <a href={`tel:${contacts.phoneHref.trim()}`} className="hover:text-primary">
+                        {contacts.phoneDisplay}
+                      </a>
+                    ) : (
+                      contacts.phoneDisplay
+                    )}
+                  </li>
+                )}
+                {hasValue(contacts.email) && (
+                  <li>
+                    <a href={`mailto:${contacts.email.trim()}`} className="hover:text-primary">
+                      {contacts.email}
+                    </a>
+                  </li>
+                )}
+                {hasValue(contacts.address) && <li>{contacts.address}</li>}
+              </ul>
+              <SocialLinks
+                contacts={contacts}
+                className="mt-4"
+                linkClassName="border border-border bg-background text-foreground/80 hover:border-primary hover:text-primary"
+              />
+            </div>
+          )}
 
-          <div>
-            <h4 className="text-sm font-semibold">Забудовник</h4>
-            <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
-              <li>ТОВ «Крила Бучі Девелопмент»</li>
-            </ul>
-          </div>
+          {hasValue(footer.developerName) && (
+            <div>
+              {hasValue(footer.developerTitle) && (
+                <h4 className="text-sm font-semibold">{footer.developerTitle}</h4>
+              )}
+              <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
+                <li>{footer.developerName}</li>
+              </ul>
+            </div>
+          )}
         </div>
         <div className="mt-10 flex flex-col items-start justify-between gap-3 border-t border-border pt-6 text-xs text-muted-foreground md:flex-row">
-          <span>© {new Date().getFullYear()} Wings Bucha. Усі права захищені.</span>
-          <span>Світла, мінімалістична та природна архітектура</span>
+          <span>
+            © {new Date().getFullYear()}
+            {hasValue(footer.copyright) ? ` ${footer.copyright}` : ""}
+          </span>
+          {hasValue(footer.tagline) && <span>{footer.tagline}</span>}
         </div>
       </div>
     </footer>

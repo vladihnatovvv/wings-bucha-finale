@@ -1,5 +1,4 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { useServerFn } from "@tanstack/react-start";
 import {
   motion,
   AnimatePresence,
@@ -24,17 +23,8 @@ import {
   Maximize2,
 } from "lucide-react";
 import { Reveal } from "@/components/site/Reveal";
-import {
-  fmtHousePrice,
-  fmtHouseSecondaryPrice,
-  getHouseTypePluralLabel,
-  getHouses,
-  readCompare,
-  readHouseTypes,
-  writeCompare,
-  type House,
-} from "@/lib/houses";
-import { listHousesFn, listHouseTypesFn } from "@/lib/content.functions";
+import { fmtHousePrice, fmtHouseSecondaryPrice, readCompare, writeCompare } from "@/lib/houses";
+import { useSiteContent } from "@/lib/site-content";
 
 function iconForType(type: string) {
   if (type === "duplex") return HomeIcon;
@@ -43,13 +33,10 @@ function iconForType(type: string) {
 }
 
 export function HouseSelector() {
-  const listHousesServer = useServerFn(listHousesFn);
-  const listHouseTypesServer = useServerFn(listHouseTypesFn);
+  const { houses, houseTypes } = useSiteContent();
   const [filter, setFilter] = useState("all");
-  const [houses, setHouses] = useState<House[]>(() => getHouses());
   const [activeId, setActiveId] = useState(() => houses[0]?.id ?? "");
   const [compare, setCompare] = useState<string[]>([]);
-  const [houseTypes, setHouseTypes] = useState(() => readHouseTypes());
 
   useEffect(() => {
     setCompare(readCompare());
@@ -57,29 +44,6 @@ export function HouseSelector() {
   useEffect(() => {
     writeCompare(compare);
   }, [compare]);
-  useEffect(() => {
-    let alive = true;
-    Promise.all([listHousesServer(), listHouseTypesServer()])
-      .then(([serverHouses, serverTypes]) => {
-        if (!alive) return;
-        setHouses(serverHouses);
-        setHouseTypes(serverTypes);
-        setActiveId((current) =>
-          serverHouses.some((house) => house.id === current)
-            ? current
-            : (serverHouses[0]?.id ?? ""),
-        );
-      })
-      .catch(() => {
-        if (!alive) return;
-        setHouses(getHouses());
-        setHouseTypes(readHouseTypes());
-      });
-    return () => {
-      alive = false;
-    };
-  }, [listHousesServer, listHouseTypesServer]);
-
   const active = houses.find((house) => house.id === activeId) ?? houses[0];
   const filters = useMemo(() => {
     const usedTypes = Array.from(new Set(houses.map((house) => house.type)));
@@ -87,8 +51,7 @@ export function HouseSelector() {
       { id: "all", label: "Всі формати", icon: Sparkles },
       ...usedTypes.map((type) => ({
         id: type,
-        label:
-          houseTypes.find((item) => item.id === type)?.pluralLabel ?? getHouseTypePluralLabel(type),
+        label: houseTypes.find((item) => item.id === type)?.pluralLabel ?? type,
         icon: iconForType(type),
       })),
     ];

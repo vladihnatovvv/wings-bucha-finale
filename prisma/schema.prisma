@@ -62,6 +62,9 @@ model SiteContacts {
   email        String
   telegramUrl  String  @map("telegram_url")
   whatsappUrl  String  @map("whatsapp_url")
+  facebookUrl  String  @default("") @map("facebook_url")
+  instagramUrl String  @default("") @map("instagram_url")
+  tiktokUrl    String  @default("") @map("tiktok_url")
   address      String
   updatedAt    DateTime @updatedAt @map("updated_at")
 
@@ -97,8 +100,19 @@ model ConstructionUpdate {
 model SiteSettings {
   id                  Int      @id @default(1)
   scrollMediaVideoUrl String   @default("") @map("scroll_media_video_url") @db.Text
+  heroVideoUrl        String   @default("") @map("hero_video_url") @db.Text
   sectionsContent     Json?    @map("sections_content")
   updatedAt           DateTime @updatedAt @map("updated_at")
 
   @@map("site_settings")
+}
+
+model Upload {
+  id        String   @id
+  mimeType  String   @map("mime_type")
+  size      Int
+  data      Bytes
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("uploads")
 }

@@ -77,61 +77,12 @@ export const DEFAULT_HOUSE_TYPES: HouseType[] = [
 const CUSTOM_HOUSES_STORAGE_KEY = "wb_custom_houses";
 const HOUSE_TYPES_STORAGE_KEY = "wb_house_types";
 
-// Inline SVG floor-plan placeholders (data URIs) so we don't need new image files.
-const planFloor = (title: string, color = "#2f6e3a") =>
-  "data:image/svg+xml;utf8," +
-  encodeURIComponent(
-    `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 560'>
-      <rect width='800' height='560' fill='#f5f3ec'/>
-      <g fill='none' stroke='${color}' stroke-width='4'>
-        <rect x='60' y='60' width='680' height='440'/>
-        <line x1='60' y1='280' x2='740' y2='280'/>
-        <line x1='380' y1='60' x2='380' y2='500'/>
-        <line x1='60' y1='180' x2='220' y2='180'/>
-        <line x1='220' y1='60' x2='220' y2='180'/>
-        <line x1='540' y1='280' x2='540' y2='500'/>
-        <line x1='540' y1='400' x2='740' y2='400'/>
-        <rect x='100' y='100' width='90' height='60' fill='${color}' opacity='0.08'/>
-        <rect x='260' y='100' width='100' height='150' fill='${color}' opacity='0.08'/>
-        <rect x='420' y='100' width='280' height='150' fill='${color}' opacity='0.08'/>
-        <rect x='100' y='320' width='240' height='150' fill='${color}' opacity='0.08'/>
-        <rect x='420' y='320' width='100' height='150' fill='${color}' opacity='0.08'/>
-        <rect x='560' y='320' width='160' height='60' fill='${color}' opacity='0.08'/>
-      </g>
-      <text x='60' y='40' font-family='Inter,sans-serif' font-size='18' fill='${color}' font-weight='600'>${title}</text>
-      <text x='110' y='140' font-family='Inter,sans-serif' font-size='12' fill='#555'>Хол</text>
-      <text x='280' y='180' font-family='Inter,sans-serif' font-size='12' fill='#555'>Кухня</text>
-      <text x='520' y='180' font-family='Inter,sans-serif' font-size='12' fill='#555'>Вітальня</text>
-      <text x='180' y='400' font-family='Inter,sans-serif' font-size='12' fill='#555'>Спальня</text>
-      <text x='450' y='400' font-family='Inter,sans-serif' font-size='12' fill='#555'>С/в</text>
-      <text x='600' y='360' font-family='Inter,sans-serif' font-size='12' fill='#555'>Гардероб</text>
-    </svg>`,
-  );
-
-const planUnit = (title: string, color = "#2f6e3a") =>
-  "data:image/svg+xml;utf8," +
-  encodeURIComponent(
-    `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 560'>
-      <rect width='800' height='560' fill='#fbfaf6'/>
-      <g fill='none' stroke='${color}' stroke-width='4'>
-        <rect x='80' y='80' width='640' height='400'/>
-        <line x1='400' y1='80' x2='400' y2='480'/>
-        <line x1='80' y1='260' x2='400' y2='260'/>
-        <line x1='560' y1='80' x2='560' y2='480'/>
-        <rect x='110' y='110' width='260' height='120' fill='${color}' opacity='0.08'/>
-        <rect x='110' y='290' width='260' height='160' fill='${color}' opacity='0.08'/>
-        <rect x='430' y='110' width='110' height='340' fill='${color}' opacity='0.08'/>
-        <rect x='590' y='110' width='110' height='160' fill='${color}' opacity='0.08'/>
-        <rect x='590' y='300' width='110' height='150' fill='${color}' opacity='0.08'/>
-      </g>
-      <text x='80' y='60' font-family='Inter,sans-serif' font-size='18' fill='${color}' font-weight='600'>${title}</text>
-      <text x='180' y='180' font-family='Inter,sans-serif' font-size='12' fill='#555'>Кухня-вітальня</text>
-      <text x='190' y='380' font-family='Inter,sans-serif' font-size='12' fill='#555'>Спальня</text>
-      <text x='450' y='280' font-family='Inter,sans-serif' font-size='12' fill='#555'>С/в</text>
-      <text x='610' y='200' font-family='Inter,sans-serif' font-size='12' fill='#555'>Спальня</text>
-      <text x='610' y='390' font-family='Inter,sans-serif' font-size='12' fill='#555'>Гардероб</text>
-    </svg>`,
-  );
+// Plans that were not uploaded yet use two static placeholder drawings from /public/images,
+// so no SVG markup is stored in the database or sent with every houses request.
+const PLAN_FLOOR_PLACEHOLDER = siteAsset("images/plan-floor-placeholder.svg");
+const PLAN_UNIT_PLACEHOLDER = siteAsset("images/plan-unit-placeholder.svg");
+const planFloor = (_title?: string) => PLAN_FLOOR_PLACEHOLDER;
+const planUnit = (_title?: string) => PLAN_UNIT_PLACEHOLDER;
 
 export const DEFAULT_HOUSES: House[] = [
   {
@@ -535,6 +486,10 @@ export function addHouseType(label: string): HouseType {
   };
   writeCustomHouseTypes([...existing, type]);
   return type;
+}
+
+export function removeHouseType(id: string) {
+  writeCustomHouseTypes(readHouseTypes().filter((type) => type.id !== id));
 }
 
 export function getHouseTypeLabel(typeId: string) {

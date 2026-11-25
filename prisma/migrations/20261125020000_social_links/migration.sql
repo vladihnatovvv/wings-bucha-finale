@@ -1,0 +1,3 @@
+ALTER TABLE "site_contacts" ADD COLUMN IF NOT EXISTS "facebook_url" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "site_contacts" ADD COLUMN IF NOT EXISTS "instagram_url" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "site_contacts" ADD COLUMN IF NOT EXISTS "tiktok_url" TEXT NOT NULL DEFAULT '';

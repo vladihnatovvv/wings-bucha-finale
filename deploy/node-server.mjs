@@ -26,6 +26,12 @@ const mimeTypes = new Map([
   [".svg", "image/svg+xml"],
   [".txt", "text/plain; charset=utf-8"],
   [".webp", "image/webp"],
+  [".avif", "image/avif"],
+  [".ico", "image/x-icon"],
+  [".mp4", "video/mp4"],
+  [".webm", "video/webm"],
+  [".mov", "video/quicktime"],
+  [".pdf", "application/pdf"],
   [".woff", "font/woff"],
   [".woff2", "font/woff2"],
 ]);
@@ -52,7 +58,7 @@ function isSafeAssetPath(filePath) {
   return relative !== "" && !relative.startsWith("..") && !path.isAbsolute(relative);
 }
 
-async function tryServeStatic(urlPath, res) {
+async function tryServeStatic(req, urlPath, res) {
   const decodedPath = decodeURIComponent(urlPath);
   const normalizedPath = decodedPath === "/" ? "" : decodedPath.replace(/^\/+/, "");
   const candidatePath = path.join(clientDir, normalizedPath);
@@ -66,14 +72,42 @@ async function tryServeStatic(urlPath, res) {
     const info = await stat(candidatePath);
     if (!info.isFile()) return false;
 
-    res.writeHead(200, {
+    const headers = {
       "content-type": getMimeType(candidatePath),
-      "content-length": info.size,
+      "accept-ranges": "bytes",
       "cache-control": normalizedPath.startsWith("assets/")
         ? "public, max-age=31536000, immutable"
         : "public, max-age=3600",
-    });
+    };
 
+    // Range support: Safari/iOS will not play <video> unless the server answers with 206.
+    const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || "");
+    if (range && (range[1] || range[2])) {
+      const start = range[1] ? Number(range[1]) : Math.max(info.size - Number(range[2]), 0);
+      const end = range[1] && range[2] ? Math.min(Number(range[2]), info.size - 1) : info.size - 1;
+      if (start > end || start >= info.size) {
+        res.writeHead(416, { "content-range": `bytes */${info.size}` });
+        res.end();
+        return true;
+      }
+      res.writeHead(206, {
+        ...headers,
+        "content-range": `bytes ${start}-${end}/${info.size}`,
+        "content-length": end - start + 1,
+      });
+      if (req.method === "HEAD") {
+        res.end();
+        return true;
+      }
+      createReadStream(candidatePath, { start, end }).pipe(res);
+      return true;
+    }
+
+    res.writeHead(200, { ...headers, "content-length": info.size });
+    if (req.method === "HEAD") {
+      res.end();
+      return true;
+    }
     createReadStream(candidatePath).pipe(res);
     return true;
   } catch {
@@ -125,7 +159,7 @@ const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
 
-    if (await tryServeStatic(url.pathname, res)) {
+    if (await tryServeStatic(req, url.pathname, res)) {
       return;
     }
 

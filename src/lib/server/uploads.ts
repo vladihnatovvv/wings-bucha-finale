@@ -1,5 +1,6 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { hasDatabaseUrl, prisma } from "./db";
 
 const MIME_EXTENSIONS: Record<string, string> = {
   "image/jpeg": ".jpg",
@@ -13,13 +14,17 @@ const MIME_EXTENSIONS: Record<string, string> = {
   "video/quicktime": ".mov",
 };
 
+const EXTENSION_MIMES = Object.fromEntries(
+  Object.entries(MIME_EXTENSIONS).map(([mime, ext]) => [ext, mime]),
+);
+
+// With DATABASE_URL files live in PostgreSQL (table "uploads") and are served by the
+// /uploads/$name route. Without it (local demo) they fall back to the UPLOAD_DIR folder.
+const PUBLIC_PREFIX = "/uploads";
+
 function uploadRoot() {
   const configured = process.env.UPLOAD_DIR || "public/uploads";
   return path.isAbsolute(configured) ? configured : path.join(process.cwd(), configured);
-}
-
-function publicBaseUrl() {
-  return (process.env.PUBLIC_UPLOAD_BASE_URL || "/uploads").replace(/\/$/, "");
 }
 
 function cleanName(name: string) {
@@ -40,20 +45,45 @@ export async function saveUploadedImage(file: File) {
 }
 
 export async function saveUploadedFile(file: File) {
-  const allowed =
-    file.type.startsWith("image/") ||
-    file.type === "application/pdf" ||
-    file.type.startsWith("video/");
+  const extension = MIME_EXTENSIONS[file.type];
 
-  if (!allowed) {
-    throw new Error("Only image, PDF and video files are allowed");
+  if (!extension) {
+    throw new Error("Only JPG, PNG, WebP, GIF, AVIF, PDF, MP4, WebM and MOV files are allowed");
   }
 
-  const extension = MIME_EXTENSIONS[file.type] || path.extname(file.name) || ".jpg";
   const filename = `${Date.now()}-${cleanName(file.name) || "file"}${extension}`;
+  const bytes = Buffer.from(await file.arrayBuffer());
+
+  if (hasDatabaseUrl()) {
+    await prisma.upload.create({
+      data: { id: filename, mimeType: file.type, size: bytes.length, data: bytes },
+    });
+    return { url: `${PUBLIC_PREFIX}/${filename}` };
+  }
+
   const root = uploadRoot();
   await mkdir(root, { recursive: true });
-  await writeFile(path.join(root, filename), Buffer.from(await file.arrayBuffer()));
+  await writeFile(path.join(root, filename), bytes);
+  const base = (process.env.PUBLIC_UPLOAD_BASE_URL || PUBLIC_PREFIX).replace(/\/$/, "");
+  return { url: `${base}/${filename}` };
+}
 
-  return { url: `${publicBaseUrl()}/${filename}` };
+export async function readUpload(
+  name: string,
+): Promise<{ data: Uint8Array<ArrayBuffer>; mimeType: string } | null> {
+  if (!/^[a-z0-9][a-z0-9._-]*$/i.test(name) || name.includes("..")) return null;
+
+  if (hasDatabaseUrl()) {
+    const row = await prisma.upload.findUnique({ where: { id: name } });
+    if (row) return { data: new Uint8Array(row.data), mimeType: row.mimeType };
+  }
+
+  // Legacy files that were written to disk before uploads moved to the database.
+  try {
+    const data = await readFile(path.join(uploadRoot(), name));
+    const mimeType = EXTENSION_MIMES[path.extname(name).toLowerCase()];
+    return mimeType ? { data: new Uint8Array(data), mimeType } : null;
+  } catch {
+    return null;
+  }
 }

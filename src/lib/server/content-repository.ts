@@ -32,6 +32,7 @@ import {
   type House,
   type HouseType,
 } from "@/lib/houses";
+import type { PublicContent } from "@/lib/site-content";
 import { hasDatabaseUrl, prisma } from "./db";
 
 function requireDb() {
@@ -108,6 +109,9 @@ function toSiteContacts(row: DbSiteContacts): SiteContacts {
     email: row.email,
     telegramUrl: row.telegramUrl,
     whatsappUrl: row.whatsappUrl,
+    facebookUrl: row.facebookUrl,
+    instagramUrl: row.instagramUrl,
+    tiktokUrl: row.tiktokUrl,
     address: row.address,
   };
 }
@@ -143,94 +147,63 @@ function toSiteSettings(row: DbSiteSettings): SiteSettings {
     Partial<SiteSections> | null | undefined;
   return {
     scrollMediaVideoUrl: row.scrollMediaVideoUrl || DEFAULT_SITE_SETTINGS.scrollMediaVideoUrl,
+    heroVideoUrl: row.heroVideoUrl,
     sections: mergeSections(DEFAULT_SITE_SECTIONS, sectionsContent),
   };
 }
 
-async function ensureDefaults() {
-  requireDb();
-
-  await Promise.all(
-    DEFAULT_HOUSE_TYPES.map((type) =>
-      prisma.houseType.upsert({
-        where: { id: type.id },
-        update: {},
-        create: type,
-      }),
-    ),
-  );
-
-  await prisma.house.createMany({
-    data: DEFAULT_HOUSES.map((house) => ({
-      id: house.id,
-      name: house.name,
-      type: house.type,
-      img: house.img,
-      facade: house.facade,
-      videoUrl: house.videoUrl,
-      area: house.area,
-      beds: house.beds,
-      baths: house.baths,
-      floors: house.floors,
-      plot: house.plot,
-      priceUsd: house.priceUsd,
-      priceUah: house.priceUah,
-      priceCurrency: house.priceCurrency ?? "USD",
-      available: house.available,
-      features: house.features,
-      floorPlans: house.floorPlans,
-      unitPlans: house.unitPlans,
-    })),
-    skipDuplicates: true,
-  });
-
-  await prisma.siteContacts.upsert({
-    where: { id: 1 },
-    update: {},
-    create: { id: 1, ...DEFAULT_CONTACTS },
-  });
-
-  await prisma.siteSettings.upsert({
-    where: { id: 1 },
-    update: {},
-    create: {
-      id: 1,
-      scrollMediaVideoUrl: DEFAULT_SITE_SETTINGS.scrollMediaVideoUrl,
-      sectionsContent: DEFAULT_SITE_SECTIONS as any,
-    },
-  });
-
-  const documentsCount = await prisma.siteDocument.count();
-  if (documentsCount === 0) {
-    await prisma.siteDocument.createMany({ data: DEFAULT_DOCUMENTS });
-  }
-
-  const constructionCount = await prisma.constructionUpdate.count();
-  if (constructionCount === 0) {
-    await prisma.constructionUpdate.createMany({
-      data: DEFAULT_CONSTRUCTION_UPDATES.map((item) => ({
-        ...item,
-        date: new Date(`${item.date}T00:00:00.000Z`),
-      })),
-    });
-  }
-}
-
 export async function listHouses(): Promise<House[]> {
   if (!hasDatabaseUrl()) return DEFAULT_HOUSES;
-  await ensureDefaults();
   const rows = await prisma.house.findMany({ orderBy: { createdAt: "asc" } });
   return rows.map(toHouse);
 }
 
-export async function getHouseById(id: string): Promise<House | undefined> {
-  if (!hasDatabaseUrl()) return DEFAULT_HOUSES.find((house) => house.id === id);
-  await ensureDefaults();
-  const row = await prisma.house.findUnique({ where: { id } });
-  return row ? toHouse(row) : undefined;
+// Public pages read the same content on every view. It is kept in memory for a short time, so a
+// traffic spike does not turn into 6 database queries per page view, and the last good copy is
+// served if the database is briefly unavailable. Every admin write clears it immediately.
+const PUBLIC_CONTENT_TTL_MS = 30_000;
+let publicContentCache: { value: PublicContent; at: number } | null = null;
+
+export function invalidatePublicContent() {
+  if (publicContentCache) publicContentCache.at = 0;
 }
 
-export async function saveHouse(house: House): Promise<House> {
+async function loadPublicContent(): Promise<PublicContent> {
+  const [houses, houseTypes, contacts, settings, documents, constructionUpdates] =
+    await Promise.all([
+      listHouses(),
+      listHouseTypes(),
+      readSiteContacts(),
+      readSiteSettings(),
+      listSiteDocuments(),
+      listConstructionUpdates(),
+    ]);
+  return { houses, houseTypes, contacts, settings, documents, constructionUpdates };
+}
+
+export async function readPublicContent(): Promise<PublicContent> {
+  if (publicContentCache && Date.now() - publicContentCache.at < PUBLIC_CONTENT_TTL_MS) {
+    return publicContentCache.value;
+  }
+  try {
+    const value = await loadPublicContent();
+    publicContentCache = { value, at: Date.now() };
+    return value;
+  } catch (error) {
+    if (publicContentCache) {
+      console.error("Database unavailable, serving the last loaded public content", error);
+      return publicContentCache.value;
+    }
+    throw error;
+  }
+}
+
+export async function getHouseById(id: string): Promise<House | undefined> {
+  const { houses } = await readPublicContent();
+  return houses.find((house) => house.id === id);
+}
+
+async function saveHouseImpl(house: House): Promise<House> {
   requireDb();
   const row = await prisma.house.upsert({
     where: { id: house.id },
@@ -277,20 +250,19 @@ export async function saveHouse(house: House): Promise<House> {
   return toHouse(row);
 }
 
-export async function deleteHouse(id: string) {
+async function deleteHouseImpl(id: string) {
   requireDb();
-  await prisma.house.delete({ where: { id } });
+  await prisma.house.deleteMany({ where: { id } });
   return { ok: true };
 }
 
 export async function listHouseTypes(): Promise<HouseType[]> {
   if (!hasDatabaseUrl()) return DEFAULT_HOUSE_TYPES;
-  await ensureDefaults();
   const rows = await prisma.houseType.findMany({ orderBy: { createdAt: "asc" } });
   return rows.map(toHouseType);
 }
 
-export async function saveHouseType(type: HouseType): Promise<HouseType> {
+async function saveHouseTypeImpl(type: HouseType): Promise<HouseType> {
   requireDb();
   const row = await prisma.houseType.upsert({
     where: { id: type.id },
@@ -298,6 +270,16 @@ export async function saveHouseType(type: HouseType): Promise<HouseType> {
     create: type,
   });
   return toHouseType(row);
+}
+
+async function deleteHouseTypeImpl(id: string) {
+  requireDb();
+  const used = await prisma.house.count({ where: { type: id } });
+  if (used > 0) {
+    throw new Error("Тип використовується в будинках. Спочатку змініть їм тип.");
+  }
+  await prisma.houseType.deleteMany({ where: { id } });
+  return { ok: true };
 }
 
 export async function listLeads(): Promise<Lead[]> {
@@ -328,12 +310,11 @@ export async function updateLeadStatus(id: string, status: LeadStatus): Promise<
 
 export async function readSiteContacts(): Promise<SiteContacts> {
   if (!hasDatabaseUrl()) return DEFAULT_CONTACTS;
-  await ensureDefaults();
   const row = await prisma.siteContacts.findUnique({ where: { id: 1 } });
   return row ? toSiteContacts(row) : DEFAULT_CONTACTS;
 }
 
-export async function writeSiteContacts(contacts: SiteContacts): Promise<SiteContacts> {
+async function writeSiteContactsImpl(contacts: SiteContacts): Promise<SiteContacts> {
   requireDb();
   const row = await prisma.siteContacts.upsert({
     where: { id: 1 },
@@ -345,12 +326,11 @@ export async function writeSiteContacts(contacts: SiteContacts): Promise<SiteCon
 
 export async function listSiteDocuments(): Promise<SiteDocument[]> {
   if (!hasDatabaseUrl()) return DEFAULT_DOCUMENTS;
-  await ensureDefaults();
   const rows = await prisma.siteDocument.findMany({ orderBy: { sortOrder: "asc" } });
   return rows.map(toSiteDocument);
 }
 
-export async function saveSiteDocument(document: SiteDocument): Promise<SiteDocument> {
+async function saveSiteDocumentImpl(document: SiteDocument): Promise<SiteDocument> {
   requireDb();
   const row = await prisma.siteDocument.upsert({
     where: { id: document.id },
@@ -365,22 +345,19 @@ export async function saveSiteDocument(document: SiteDocument): Promise<SiteDocu
   return toSiteDocument(row);
 }
 
-export async function deleteSiteDocument(id: string) {
+async function deleteSiteDocumentImpl(id: string) {
   requireDb();
-  await prisma.siteDocument.delete({ where: { id } });
+  await prisma.siteDocument.deleteMany({ where: { id } });
   return { ok: true };
 }
 
 export async function listConstructionUpdates(): Promise<ConstructionUpdate[]> {
   if (!hasDatabaseUrl()) return DEFAULT_CONSTRUCTION_UPDATES;
-  await ensureDefaults();
   const rows = await prisma.constructionUpdate.findMany({ orderBy: { sortOrder: "asc" } });
   return rows.map(toConstructionUpdate);
 }
 
-export async function saveConstructionUpdate(
-  update: ConstructionUpdate,
-): Promise<ConstructionUpdate> {
+async function saveConstructionUpdateImpl(update: ConstructionUpdate): Promise<ConstructionUpdate> {
   requireDb();
   const payload = {
     date: new Date(`${update.date}T00:00:00.000Z`),
@@ -398,15 +375,14 @@ export async function saveConstructionUpdate(
   return toConstructionUpdate(row);
 }
 
-export async function deleteConstructionUpdate(id: string) {
+async function deleteConstructionUpdateImpl(id: string) {
   requireDb();
-  await prisma.constructionUpdate.delete({ where: { id } });
+  await prisma.constructionUpdate.deleteMany({ where: { id } });
   return { ok: true };
 }
 
 export async function readSiteSettings(): Promise<SiteSettings> {
   if (!hasDatabaseUrl()) return DEFAULT_SITE_SETTINGS;
-  await ensureDefaults();
   try {
     const row = await prisma.siteSettings.findUnique({ where: { id: 1 } });
     return row ? toSiteSettings(row) : DEFAULT_SITE_SETTINGS;
@@ -416,10 +392,11 @@ export async function readSiteSettings(): Promise<SiteSettings> {
   }
 }
 
-export async function writeSiteSettings(settings: SiteSettings): Promise<SiteSettings> {
+async function writeSiteSettingsImpl(settings: SiteSettings): Promise<SiteSettings> {
   requireDb();
   const payload = {
     scrollMediaVideoUrl: settings.scrollMediaVideoUrl,
+    heroVideoUrl: settings.heroVideoUrl ?? "",
     sectionsContent: (settings.sections ?? DEFAULT_SITE_SECTIONS) as any,
   };
 
@@ -439,7 +416,30 @@ export async function writeSiteSettings(settings: SiteSettings): Promise<SiteSet
     });
     return {
       scrollMediaVideoUrl: row.scrollMediaVideoUrl,
+      heroVideoUrl: settings.heroVideoUrl ?? "",
       sections: settings.sections ?? DEFAULT_SITE_SECTIONS,
     };
   }
 }
+
+// Admin writes: run the write, then drop the cached public content.
+function invalidating<A extends unknown[], R>(write: (...args: A) => Promise<R>) {
+  return async (...args: A): Promise<R> => {
+    try {
+      return await write(...args);
+    } finally {
+      invalidatePublicContent();
+    }
+  };
+}
+
+export const saveHouse = invalidating(saveHouseImpl);
+export const deleteHouse = invalidating(deleteHouseImpl);
+export const saveHouseType = invalidating(saveHouseTypeImpl);
+export const deleteHouseType = invalidating(deleteHouseTypeImpl);
+export const writeSiteContacts = invalidating(writeSiteContactsImpl);
+export const saveSiteDocument = invalidating(saveSiteDocumentImpl);
+export const deleteSiteDocument = invalidating(deleteSiteDocumentImpl);
+export const saveConstructionUpdate = invalidating(saveConstructionUpdateImpl);
+export const deleteConstructionUpdate = invalidating(deleteConstructionUpdateImpl);
+export const writeSiteSettings = invalidating(writeSiteSettingsImpl);

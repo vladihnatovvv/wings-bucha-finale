@@ -14,6 +14,11 @@ async function requireAdmin() {
   auth.requireAdmin();
 }
 
+export const readPublicContentFn = createServerFn({ method: "GET" }).handler(async () => {
+  const repo = await import("./server/content-repository");
+  return repo.readPublicContent();
+});
+
 export const checkAdminAuthFn = createServerFn({ method: "GET" }).handler(async () => {
   const auth = await import("./server/admin-auth");
   return auth.getAdminAuthState();
@@ -70,6 +75,14 @@ export const saveHouseTypeFn = createServerFn({ method: "POST" })
     await requireAdmin();
     const repo = await import("./server/content-repository");
     return repo.saveHouseType(data);
+  });
+
+export const deleteHouseTypeFn = createServerFn({ method: "POST" })
+  .validator((data: { id: string }) => data)
+  .handler(async ({ data }) => {
+    await requireAdmin();
+    const repo = await import("./server/content-repository");
+    return repo.deleteHouseType(data.id);
   });
 
 export const listLeadsFn = createServerFn({ method: "GET" }).handler(async () => {

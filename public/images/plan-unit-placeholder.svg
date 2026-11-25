@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 560">
+  <rect width="800" height="560" fill="#fbfaf6"/>
+  <g fill="none" stroke="#2f6e3a" stroke-width="4">
+    <rect x="80" y="80" width="640" height="400"/>
+    <line x1="400" y1="80" x2="400" y2="480"/>
+    <line x1="80" y1="260" x2="400" y2="260"/>
+    <line x1="560" y1="80" x2="560" y2="480"/>
+    <rect x="110" y="110" width="260" height="120" fill="#2f6e3a" opacity="0.08"/>
+    <rect x="110" y="290" width="260" height="160" fill="#2f6e3a" opacity="0.08"/>
+    <rect x="430" y="110" width="110" height="340" fill="#2f6e3a" opacity="0.08"/>
+    <rect x="590" y="110" width="110" height="160" fill="#2f6e3a" opacity="0.08"/>
+    <rect x="590" y="300" width="110" height="150" fill="#2f6e3a" opacity="0.08"/>
+  </g>
+  <text x="80" y="60" font-family="Inter,sans-serif" font-size="18" fill="#2f6e3a" font-weight="600">Умовна схема планування</text>
+</svg>

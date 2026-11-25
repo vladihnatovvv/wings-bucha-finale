@@ -1,26 +1,9 @@
-import { useServerFn } from "@tanstack/react-start";
 import { MessageCircle, Phone } from "lucide-react";
-import { useEffect, useState } from "react";
-import { DEFAULT_CONTACTS, readSiteContacts } from "@/lib/admin-store";
-import { readSiteContactsFn } from "@/lib/content.functions";
+import { useSiteContent } from "@/lib/site-content";
+import { hasValue } from "@/components/site/SocialLinks";
 
 export function FloatingContacts() {
-  const readSiteContactsServer = useServerFn(readSiteContactsFn);
-  const [contacts, setContacts] = useState(DEFAULT_CONTACTS);
-
-  useEffect(() => {
-    let alive = true;
-    readSiteContactsServer()
-      .then((serverContacts) => {
-        if (alive) setContacts(serverContacts);
-      })
-      .catch(() => {
-        if (alive) setContacts(readSiteContacts());
-      });
-    return () => {
-      alive = false;
-    };
-  }, [readSiteContactsServer]);
+  const { contacts } = useSiteContent();
 
   const items = [
     { href: contacts.telegramUrl, label: "Telegram", bg: "bg-[#229ED9]", icon: <TelegramIcon /> },
@@ -31,12 +14,15 @@ export function FloatingContacts() {
       icon: <MessageCircle className="h-5 w-5" />,
     },
     {
-      href: `tel:${contacts.phoneHref}`,
+      href: hasValue(contacts.phoneHref) ? `tel:${contacts.phoneHref.trim()}` : "",
       label: "Зателефонувати",
       bg: "bg-primary",
       icon: <Phone className="h-5 w-5" />,
     },
-  ];
+  ].filter((item) => hasValue(item.href) && item.href !== "tel:");
+
+  if (items.length === 0) return null;
+
   return (
     <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end gap-3">
       {items.map((it) => (

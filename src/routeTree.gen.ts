@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as CompareRouteImport } from './routes/compare'
 import { Route as HouseIdRouteImport } from './routes/house.$id'
+import { Route as UploadsNameRouteImport } from './routes/uploads.$name'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -34,18 +35,25 @@ const HouseIdRoute = HouseIdRouteImport.update({
   path: '/house/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const UploadsNameRoute = UploadsNameRouteImport.update({
+  id: '/uploads/$name',
+  path: '/uploads/$name',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/compare': typeof CompareRoute
   '/house/$id': typeof HouseIdRoute
+  '/uploads/$name': typeof UploadsNameRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/compare': typeof CompareRoute
   '/house/$id': typeof HouseIdRoute
+  '/uploads/$name': typeof UploadsNameRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -53,13 +61,14 @@ export interface FileRoutesById {
   '/admin': typeof AdminRoute
   '/compare': typeof CompareRoute
   '/house/$id': typeof HouseIdRoute
+  '/uploads/$name': typeof UploadsNameRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/admin' | '/compare' | '/house/$id'
+  fullPaths: '/' | '/admin' | '/compare' | '/house/$id' | '/uploads/$name'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/admin' | '/compare' | '/house/$id'
-  id: '__root__' | '/' | '/admin' | '/compare' | '/house/$id'
+  to: '/' | '/admin' | '/compare' | '/house/$id' | '/uploads/$name'
+  id: '__root__' | '/' | '/admin' | '/compare' | '/house/$id' | '/uploads/$name'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -67,6 +76,7 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRoute
   CompareRoute: typeof CompareRoute
   HouseIdRoute: typeof HouseIdRoute
+  UploadsNameRoute: typeof UploadsNameRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -99,6 +109,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HouseIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/uploads/$name': {
+      id: '/uploads/$name'
+      path: '/uploads/$name'
+      fullPath: '/uploads/$name'
+      preLoaderRoute: typeof UploadsNameRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -107,6 +124,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRoute,
   CompareRoute: CompareRoute,
   HouseIdRoute: HouseIdRoute,
+  UploadsNameRoute: UploadsNameRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

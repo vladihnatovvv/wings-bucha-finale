@@ -1,5 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useServerFn } from "@tanstack/react-start";
 import {
   TreePine,
   Flame,
@@ -18,34 +17,24 @@ import {
   ArrowRight,
   CheckCircle2,
 } from "lucide-react";
-import { lazy, Suspense, useEffect, useState, useRef } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState, useRef } from "react";
 import { motion, useScroll, useTransform, useSpring, AnimatePresence } from "motion/react";
 import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { FloatingContacts } from "@/components/site/FloatingContacts";
 import { ContactForm } from "@/components/site/ContactForm";
+import { SocialLinks, hasValue } from "@/components/site/SocialLinks";
+import { Marked } from "@/components/site/Marked";
 import { Reveal, Parallax } from "@/components/site/Reveal";
 import { siteAsset } from "@/lib/assets";
 import {
   DEFAULT_CONSTRUCTION_UPDATES,
-  DEFAULT_CONTACTS,
-  DEFAULT_DOCUMENTS,
   DEFAULT_SITE_SECTIONS,
-  DEFAULT_SITE_SETTINGS,
-  readConstructionUpdates,
-  readSiteContacts,
-  readSiteDocuments,
-  readSiteSettings,
+  type HeroSection,
   type SiteSections,
 } from "@/lib/admin-store";
-import { fmtUsd, getHouses } from "@/lib/houses";
-import {
-  listConstructionUpdatesFn,
-  listHousesFn,
-  listSiteDocumentsFn,
-  readSiteContactsFn,
-  readSiteSettingsFn,
-} from "@/lib/content.functions";
+import { fmtUsd } from "@/lib/houses";
+import { useSiteContent } from "@/lib/site-content";
 
 const LazyHouseSelector = lazy(() =>
   import("@/components/site/HouseSelector").then(({ HouseSelector }) => ({
@@ -70,8 +59,6 @@ const masterplan = siteAsset("images/masterplan-800.webp");
 const masterplanLarge = siteAsset("images/masterplan-1200.webp");
 const aboutWide = siteAsset("images/about-wide-800.webp");
 const aboutWideLarge = siteAsset("images/about-wide-1600.webp");
-const financingPhoto = siteAsset("images/financing-720.webp");
-const contactPhoto = siteAsset("images/contact-720.webp");
 const constructionFallback = new Map(
   DEFAULT_CONSTRUCTION_UPDATES.map((item) => [item.id, item.image]),
 );
@@ -103,24 +90,9 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
-  const readSettingsServer = useServerFn(readSiteSettingsFn);
-  const [settings, setSettings] = useState(DEFAULT_SITE_SETTINGS);
+  const { settings } = useSiteContent();
   const { scrollYProgress } = useScroll();
   const scaleX = useSpring(scrollYProgress, { stiffness: 100, damping: 30, restDelta: 0.001 });
-
-  useEffect(() => {
-    let alive = true;
-    readSettingsServer()
-      .then((serverSettings) => {
-        if (alive) setSettings(serverSettings);
-      })
-      .catch(() => {
-        if (alive) setSettings(readSiteSettings());
-      });
-    return () => {
-      alive = false;
-    };
-  }, [readSettingsServer]);
 
   const sections = settings.sections ?? DEFAULT_SITE_SECTIONS;
 
@@ -132,7 +104,7 @@ function Index() {
       />
       <Header />
       <main>
-        <Hero />
+        <Hero content={sections.hero} videoUrl={settings.heroVideoUrl} />
         <ScrollVideo videoUrl={settings.scrollMediaVideoUrl} />
         <Marquee items={sections.marquee} />
         <About content={sections.about} />
@@ -196,51 +168,79 @@ function LazyOnView({
 }
 
 /* ───────── HERO ───────── */
-function Hero() {
-  const listHousesServer = useServerFn(listHousesFn);
+function Hero({ content, videoUrl }: { content: HeroSection; videoUrl?: string }) {
+  const { houses } = useSiteContent();
   const ref = useRef<HTMLDivElement>(null);
-  const [heroStats, setHeroStats] = useState({ available: 25, minPrice: 145000 });
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [videoPlaying, setVideoPlaying] = useState(false);
+  const [reduceMotion, setReduceMotion] = useState(false);
+  const heroVideo = hasValue(videoUrl) && !reduceMotion ? videoUrl.trim() : "";
+  const heroStats = useMemo(
+    () =>
+      houses.length === 0
+        ? null
+        : {
+            available: houses.reduce((total, house) => total + house.available, 0),
+            minPrice: Math.min(...houses.map((house) => house.priceUsd)),
+          },
+    [houses],
+  );
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end start"] });
   const imgY = useTransform(scrollYProgress, [0, 1], [0, 60]);
   const imgScale = useTransform(scrollYProgress, [0, 1], [1.04, 1.14]);
 
+  // People who asked the OS to reduce motion keep the still photo.
   useEffect(() => {
-    let alive = true;
-    listHousesServer()
-      .then((houses) => {
-        if (!alive) return;
-        setHeroStats({
-          available: houses.reduce((total, house) => total + house.available, 0),
-          minPrice: Math.min(...houses.map((house) => house.priceUsd)),
-        });
-      })
-      .catch(() => {
-        if (!alive) return;
-        const houses = getHouses();
-        setHeroStats({
-          available: houses.reduce((total, house) => total + house.available, 0),
-          minPrice: Math.min(...houses.map((house) => house.priceUsd)),
-        });
-      });
-    return () => {
-      alive = false;
-    };
-  }, [listHousesServer]);
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReduceMotion(query.matches);
+    const onChange = (event: MediaQueryListEvent) => setReduceMotion(event.matches);
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, []);
+
+  // React does not always apply `muted` before autoplay, so start playback explicitly.
+  useEffect(() => {
+    setVideoPlaying(false);
+    const video = videoRef.current;
+    if (!video || !heroVideo) return;
+    video.muted = true;
+    video.play().catch(() => {
+      /* autoplay blocked (e.g. low-power mode): the photo stays visible */
+    });
+  }, [heroVideo]);
+
+  const titleLines = content.title.split("\n").filter((line) => line.trim() !== "");
+  const stats = content.stats.filter((stat) => hasValue(stat.value) || hasValue(stat.label));
+  const progressTotal = Math.max(0, Math.min(24, Math.round(content.progressTotal || 0)));
+  const progressFilled = Math.max(
+    0,
+    Math.min(progressTotal, Math.round(content.progressFilled || 0)),
+  );
+  const showTopStrip =
+    hasValue(content.topLeft) || hasValue(content.topStatus) || hasValue(content.topDate);
+  const showAvailableCard = heroStats !== null && hasValue(content.availableLabel);
+  const showPriceCard = heroStats !== null && hasValue(content.priceLabel);
+  const showCredit = hasValue(content.creditLabel) || hasValue(content.creditBadge);
+  const customImage = hasValue(content.image) ? content.image.trim() : "";
 
   return (
     <section ref={ref} className="relative isolate overflow-hidden bg-background text-foreground">
       {/* Top meta strip */}
-      <div className="container-x relative z-10 flex items-center justify-between border-b border-border/60 py-5 text-[11px] uppercase tracking-[0.28em] text-muted-foreground">
-        <span>Котеджне містечко — Буча · Лісова 28</span>
-        <span className="hidden items-center gap-2 md:inline-flex">
-          <span className="relative inline-flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/60" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
-          </span>
-          Старт продажів · І черга
-        </span>
-        <span className="serif-italic text-base tracking-normal">10.06.2026</span>
-      </div>
+      {showTopStrip && (
+        <div className="container-x relative z-10 flex items-center justify-between gap-4 border-b border-border/60 py-5 text-[11px] uppercase tracking-[0.28em] text-muted-foreground">
+          <span>{content.topLeft}</span>
+          {hasValue(content.topStatus) && (
+            <span className="hidden items-center gap-2 md:inline-flex">
+              <span className="relative inline-flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/60" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+              </span>
+              {content.topStatus}
+            </span>
+          )}
+          <span className="serif-italic text-base tracking-normal">{content.topDate}</span>
+        </div>
+      )}
 
       {/* Soft background blob */}
       <div
@@ -251,48 +251,74 @@ function Hero() {
       <div className="container-x relative grid grid-cols-1 items-center gap-14 pt-12 pb-20 lg:grid-cols-12 lg:gap-10 lg:pt-20 lg:pb-28">
         {/* LEFT — copy */}
         <div className="lg:col-span-6">
-          <div className="inline-flex items-center gap-3 text-[11px] uppercase tracking-[0.32em] text-primary">
-            <span className="h-px w-10 bg-primary" />
-            Преміальний еко-квартал
-          </div>
+          {hasValue(content.eyebrow) && (
+            <div className="inline-flex items-center gap-3 text-[11px] uppercase tracking-[0.32em] text-primary">
+              <span className="h-px w-10 bg-primary" />
+              {content.eyebrow}
+            </div>
+          )}
 
-          <h1 className="mt-7 text-[2.75rem] font-light leading-[0.98] tracking-[-0.03em] sm:text-6xl lg:text-[5.5rem]">
-            Дім серед <span className="serif-italic text-forest">сосен,</span>
-            <span className="mt-2 block">
-              політ <span className="serif-italic text-forest">без меж.</span>
-            </span>
-          </h1>
+          {titleLines.length > 0 && (
+            <h1 className="mt-7 text-[2.75rem] font-light leading-[0.98] tracking-[-0.03em] sm:text-6xl lg:text-[5.5rem]">
+              {titleLines.map((line, index) => (
+                <span key={index} className={index > 0 ? "mt-2 block" : undefined}>
+                  <Marked text={line} emphasisClassName="serif-italic text-forest" />
+                </span>
+              ))}
+            </h1>
+          )}
 
-          <p className="mt-8 max-w-md text-base leading-relaxed text-muted-foreground">
-            Камерний квартал на 7 гектарах сосен у Бучі. Архітектура з природного каменю та дерева,
-            повна газифікація, закрита територія. Кредит за{" "}
-            <span className="font-semibold text-foreground">єОселя 3%</span>.
-          </p>
+          {hasValue(content.description) && (
+            <p className="mt-8 max-w-md text-base leading-relaxed text-muted-foreground">
+              <Marked
+                text={content.description}
+                emphasisClassName="font-semibold text-foreground"
+              />
+            </p>
+          )}
 
-          <div className="mt-10 flex flex-wrap items-center gap-6">
-            <a
-              href="#houses"
-              className="group inline-flex items-center gap-4 rounded-full bg-foreground py-2 pl-7 pr-2 text-sm font-semibold tracking-wide text-background transition-all hover:scale-[1.02] hover:bg-forest"
+          {(hasValue(content.primaryButton) || hasValue(content.secondaryButton)) && (
+            <div className="mt-10 flex flex-wrap items-center gap-6">
+              {hasValue(content.primaryButton) && (
+                <a
+                  href="#houses"
+                  className="group inline-flex items-center gap-4 rounded-full bg-foreground py-2 pl-7 pr-2 text-sm font-semibold tracking-wide text-background transition-all hover:scale-[1.02] hover:bg-forest"
+                >
+                  {content.primaryButton}
+                  <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-primary text-primary-foreground transition-transform group-hover:translate-x-1">
+                    <ArrowRight className="h-4 w-4" />
+                  </span>
+                </a>
+              )}
+              {hasValue(content.secondaryButton) && (
+                <a
+                  href="#contact"
+                  className="group inline-flex items-center gap-3 text-sm font-semibold tracking-wide text-foreground"
+                >
+                  {content.secondaryButton}
+                  <span className="h-px w-10 bg-foreground transition-all group-hover:w-16" />
+                </a>
+              )}
+            </div>
+          )}
+
+          {stats.length > 0 && (
+            <div
+              className="mt-14 grid max-w-lg gap-3 border-t border-border/70 pt-8 sm:gap-6"
+              style={{
+                gridTemplateColumns: `repeat(${Math.min(stats.length, 4)}, minmax(0, 1fr))`,
+              }}
             >
-              Обрати резиденцію
-              <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-primary text-primary-foreground transition-transform group-hover:translate-x-1">
-                <ArrowRight className="h-4 w-4" />
-              </span>
-            </a>
-            <a
-              href="#contact"
-              className="group inline-flex items-center gap-3 text-sm font-semibold tracking-wide text-foreground"
-            >
-              Запросити приватний показ
-              <span className="h-px w-10 bg-foreground transition-all group-hover:w-16" />
-            </a>
-          </div>
-
-          <div className="mt-14 grid max-w-lg grid-cols-3 gap-3 border-t border-border/70 pt-8 sm:gap-6">
-            <HeroStat value="єОселя" label="акредитований забудовник" italic />
-            <HeroStat value="15 хв" label="до центру Києва" />
-            <HeroStat value="7 га" label="соснового лісу" />
-          </div>
+              {stats.map((stat, index) => (
+                <HeroStat
+                  key={index}
+                  value={stat.value}
+                  label={stat.label}
+                  italic={!/\d/.test(stat.value)}
+                />
+              ))}
+            </div>
+          )}
         </div>
 
         {/* RIGHT — image with floating cards */}
@@ -304,8 +330,12 @@ function Hero() {
             className="relative mx-auto aspect-[4/5] w-full max-w-[560px] overflow-hidden rounded-[120px] shadow-[0_40px_120px_-30px_oklch(0.42_0.075_150/0.35)] sm:rounded-[200px] lg:rounded-[280px]"
           >
             <motion.img
-              src={heroHouse}
-              srcSet={`${heroHouse} 640w, ${heroHouseMedium} 800w, ${heroHouseLarge} 1120w`}
+              src={customImage || heroHouse}
+              srcSet={
+                customImage
+                  ? undefined
+                  : `${heroHouse} 640w, ${heroHouseMedium} 800w, ${heroHouseLarge} 1120w`
+              }
               sizes="(min-width: 1024px) 46vw, 100vw"
               alt="Wings Bucha — резиденція серед сосен"
               width={1120}
@@ -314,62 +344,96 @@ function Hero() {
               style={{ y: imgY, scale: imgScale }}
               className="h-full w-full object-cover"
             />
+            {heroVideo && (
+              <motion.video
+                key={heroVideo}
+                ref={videoRef}
+                src={heroVideo}
+                poster={customImage || heroHouseMedium}
+                autoPlay
+                muted
+                loop
+                playsInline
+                preload="auto"
+                aria-hidden
+                onPlaying={() => setVideoPlaying(true)}
+                onError={() => setVideoPlaying(false)}
+                style={{ y: imgY, scale: imgScale }}
+                className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ${
+                  videoPlaying ? "opacity-100" : "opacity-0"
+                }`}
+              />
+            )}
           </motion.div>
 
           {/* Floating — residences */}
-          <motion.div
-            initial={{ opacity: 0, y: -20, x: 20 }}
-            animate={{ opacity: 1, y: 0, x: 0 }}
-            transition={{ duration: 1, delay: 0.4 }}
-            className="absolute right-2 top-4 w-[180px] rounded-3xl bg-foreground p-4 text-background shadow-2xl sm:right-0 sm:top-6 sm:w-[230px] sm:p-5 lg:right-[-20px]"
-          >
-            <div className="text-[10px] uppercase tracking-[0.24em] text-background/60">
-              Доступно у І черзі
-            </div>
-            <div className="mt-2 flex items-baseline gap-2">
-              <span className="serif-italic text-4xl leading-none sm:text-5xl">
-                {heroStats.available}
-              </span>
-              <span className="text-xs uppercase tracking-wider text-background/70">
-                резиденцій
-              </span>
-            </div>
-            <div className="mt-4 flex gap-1.5">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <span
-                  key={i}
-                  className={`h-2.5 w-2.5 rounded-full ${i < 5 ? "bg-primary" : "bg-background/20"}`}
-                />
-              ))}
-            </div>
-            <div className="mt-3 text-[10px] uppercase tracking-[0.18em] text-background/55">
-              5 з 8 черг заброньовано
-            </div>
-          </motion.div>
+          {showAvailableCard && heroStats && (
+            <motion.div
+              initial={{ opacity: 0, y: -20, x: 20 }}
+              animate={{ opacity: 1, y: 0, x: 0 }}
+              transition={{ duration: 1, delay: 0.4 }}
+              className="absolute right-2 top-4 w-[180px] rounded-3xl bg-foreground p-4 text-background shadow-2xl sm:right-0 sm:top-6 sm:w-[230px] sm:p-5 lg:right-[-20px]"
+            >
+              <div className="text-[10px] uppercase tracking-[0.24em] text-background/60">
+                {content.availableLabel}
+              </div>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="serif-italic text-4xl leading-none sm:text-5xl">
+                  {heroStats.available}
+                </span>
+                {hasValue(content.availableUnit) && (
+                  <span className="text-xs uppercase tracking-wider text-background/70">
+                    {content.availableUnit}
+                  </span>
+                )}
+              </div>
+              {progressTotal > 0 && (
+                <div className="mt-4 flex gap-1.5">
+                  {Array.from({ length: progressTotal }).map((_, i) => (
+                    <span
+                      key={i}
+                      className={`h-2.5 w-2.5 rounded-full ${i < progressFilled ? "bg-primary" : "bg-background/20"}`}
+                    />
+                  ))}
+                </div>
+              )}
+              {hasValue(content.progressCaption) && (
+                <div className="mt-3 text-[10px] uppercase tracking-[0.18em] text-background/55">
+                  {content.progressCaption}
+                </div>
+              )}
+            </motion.div>
+          )}
 
           {/* Floating — price */}
-          <motion.div
-            initial={{ opacity: 0, y: 20, x: -20 }}
-            animate={{ opacity: 1, y: 0, x: 0 }}
-            transition={{ duration: 1, delay: 0.55 }}
-            className="absolute -bottom-4 left-2 w-[210px] rounded-3xl bg-background p-4 shadow-[0_30px_70px_-20px_rgba(0,0,0,0.25)] ring-1 ring-border sm:-bottom-6 sm:left-0 sm:w-[270px] sm:p-5 lg:left-[-30px]"
-          >
-            <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.24em] text-muted-foreground">
-              <span>Стартова ціна</span>
-              <span>від</span>
-            </div>
-            <div className="mt-2 flex items-baseline gap-1">
-              <span className="text-3xl font-light tracking-tight sm:text-4xl">
-                {fmtUsd(heroStats.minPrice)}
-              </span>
-            </div>
-            <div className="mt-4 flex items-center justify-between border-t border-border/70 pt-3 text-xs">
-              <span className="text-muted-foreground">Кредит від</span>
-              <span className="rounded-full bg-primary-soft px-2.5 py-1 text-[11px] font-semibold text-forest">
-                3% єОселя
-              </span>
-            </div>
-          </motion.div>
+          {showPriceCard && heroStats && (
+            <motion.div
+              initial={{ opacity: 0, y: 20, x: -20 }}
+              animate={{ opacity: 1, y: 0, x: 0 }}
+              transition={{ duration: 1, delay: 0.55 }}
+              className="absolute -bottom-4 left-2 w-[210px] rounded-3xl bg-background p-4 shadow-[0_30px_70px_-20px_rgba(0,0,0,0.25)] ring-1 ring-border sm:-bottom-6 sm:left-0 sm:w-[270px] sm:p-5 lg:left-[-30px]"
+            >
+              <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.24em] text-muted-foreground">
+                <span>{content.priceLabel}</span>
+                <span>{content.priceFrom}</span>
+              </div>
+              <div className="mt-2 flex items-baseline gap-1">
+                <span className="text-3xl font-light tracking-tight sm:text-4xl">
+                  {fmtUsd(heroStats.minPrice)}
+                </span>
+              </div>
+              {showCredit && (
+                <div className="mt-4 flex items-center justify-between border-t border-border/70 pt-3 text-xs">
+                  <span className="text-muted-foreground">{content.creditLabel}</span>
+                  {hasValue(content.creditBadge) && (
+                    <span className="rounded-full bg-primary-soft px-2.5 py-1 text-[11px] font-semibold text-forest">
+                      {content.creditBadge}
+                    </span>
+                  )}
+                </div>
+              )}
+            </motion.div>
+          )}
         </div>
       </div>
     </section>
@@ -392,10 +456,8 @@ function HeroStat({ value, label, italic }: { value: string; label: string; ital
 }
 
 /* ───────── SCROLL MEDIA ───────── */
-function ScrollVideo({ videoUrl }: { videoUrl?: string }) {
-  const readSettingsServer = useServerFn(readSiteSettingsFn);
+function ScrollVideo({ videoUrl }: { videoUrl: string }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [settings, setSettings] = useState(DEFAULT_SITE_SETTINGS);
   const [loadVideo, setLoadVideo] = useState(false);
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
 
@@ -403,23 +465,7 @@ function ScrollVideo({ videoUrl }: { videoUrl?: string }) {
   const width = useTransform(scrollYProgress, [0, 0.5], ["32%", "100%"]);
   const height = useTransform(scrollYProgress, [0, 0.5], ["38vh", "100vh"]);
   const radius = useTransform(scrollYProgress, [0, 0.5], [32, 0]);
-  const activeVideo =
-    (videoUrl ?? settings.scrollMediaVideoUrl).trim() || DEFAULT_SITE_SETTINGS.scrollMediaVideoUrl;
-
-  useEffect(() => {
-    if (videoUrl !== undefined) return;
-    let alive = true;
-    readSettingsServer()
-      .then((serverSettings) => {
-        if (alive) setSettings(serverSettings);
-      })
-      .catch(() => {
-        if (alive) setSettings(readSiteSettings());
-      });
-    return () => {
-      alive = false;
-    };
-  }, [readSettingsServer, videoUrl]);
+  const activeVideo = videoUrl.trim();
 
   useEffect(() => {
     const element = ref.current;
@@ -763,8 +809,7 @@ function Tag({ children }: { children: React.ReactNode }) {
 /* ───────── FINANCING ───────── */
 function Financing({ content }: { content?: SiteSections["financing"] }) {
   const activeContent = content ?? DEFAULT_SITE_SECTIONS.financing;
-  const { eyebrow, title, description, image, programs } = activeContent;
-  const imageSrc = image.trim() || financingPhoto;
+  const { eyebrow, title, description, programs } = activeContent;
 
   return (
     <section id="financing" className="container-x py-24 md:py-32">
@@ -786,20 +831,6 @@ function Financing({ content }: { content?: SiteSections["financing"] }) {
                 <Wallet className="mr-2 h-4 w-4" /> Розрахувати кредит
                 <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
               </a>
-
-              <Parallax offset={20}>
-                <div className="mt-8 overflow-hidden rounded-2xl shadow-soft">
-                  <img
-                    src={imageSrc}
-                    alt="Таунхауси Wings Bucha"
-                    width={720}
-                    height={540}
-                    loading="lazy"
-                    decoding="async"
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-              </Parallax>
             </div>
 
             <div className="grid gap-4">
@@ -888,22 +919,9 @@ function Masterplan({ content }: { content?: SiteSections["masterplan"] }) {
 
 /* ───────── CONSTRUCTION ───────── */
 function ConstructionProgress() {
-  const listUpdatesServer = useServerFn(listConstructionUpdatesFn);
-  const [updates, setUpdates] = useState(DEFAULT_CONSTRUCTION_UPDATES);
+  const { constructionUpdates: updates } = useSiteContent();
 
-  useEffect(() => {
-    let alive = true;
-    listUpdatesServer()
-      .then((items) => {
-        if (alive) setUpdates(items.length ? items : DEFAULT_CONSTRUCTION_UPDATES);
-      })
-      .catch(() => {
-        if (alive) setUpdates(readConstructionUpdates());
-      });
-    return () => {
-      alive = false;
-    };
-  }, [listUpdatesServer]);
+  if (updates.length === 0) return null;
 
   const ordered = [...updates].sort((a, b) => a.sortOrder - b.sortOrder);
   const overall = ordered.length
@@ -982,22 +1000,9 @@ function ConstructionProgress() {
 
 /* ───────── DOCUMENTS ───────── */
 function Documents() {
-  const listDocumentsServer = useServerFn(listSiteDocumentsFn);
-  const [docs, setDocs] = useState(DEFAULT_DOCUMENTS);
+  const { documents: docs } = useSiteContent();
 
-  useEffect(() => {
-    let alive = true;
-    listDocumentsServer()
-      .then((items) => {
-        if (alive) setDocs(items.length ? items : DEFAULT_DOCUMENTS);
-      })
-      .catch(() => {
-        if (alive) setDocs(readSiteDocuments());
-      });
-    return () => {
-      alive = false;
-    };
-  }, [listDocumentsServer]);
+  if (docs.length === 0) return null;
 
   return (
     <section id="docs" className="bg-beige/40 py-24 md:py-32">
@@ -1170,25 +1175,9 @@ function Location({ content }: { content?: SiteSections["location"] }) {
 /* ───────── CONTACT ───────── */
 function Contact({ content }: { content?: SiteSections["contactCta"] }) {
   const activeContent = content ?? DEFAULT_SITE_SECTIONS.contactCta;
-  const { badge, title, description, image } = activeContent;
-  const imageSrc = image.trim() || contactPhoto;
+  const { badge, title, description } = activeContent;
 
-  const readSiteContactsServer = useServerFn(readSiteContactsFn);
-  const [contacts, setContacts] = useState(DEFAULT_CONTACTS);
-
-  useEffect(() => {
-    let alive = true;
-    readSiteContactsServer()
-      .then((serverContacts) => {
-        if (alive) setContacts(serverContacts);
-      })
-      .catch(() => {
-        if (alive) setContacts(readSiteContacts());
-      });
-    return () => {
-      alive = false;
-    };
-  }, [readSiteContactsServer]);
+  const { contacts } = useSiteContent();
 
   return (
     <section
@@ -1214,30 +1203,37 @@ function Contact({ content }: { content?: SiteSections["contactCta"] }) {
             {description}
           </p>
           <div className="mt-9 space-y-3 text-sm">
-            <div>
-              📞{" "}
-              <a href={`tel:${contacts.phoneHref}`} className="font-semibold hover:underline">
-                {contacts.phoneDisplay}
-              </a>
-            </div>
-            <div>
-              ✉️{" "}
-              <a href={`mailto:${contacts.email}`} className="font-semibold hover:underline">
-                {contacts.email}
-              </a>
-            </div>
-            <div>📍 {contacts.address}</div>
-          </div>
-
-          <div className="mt-8 overflow-hidden rounded-[1.5rem] ring-1 ring-white/20">
-            <img
-              src={imageSrc}
-              alt="Сітіхауси Wings Bucha"
-              width={720}
-              height={540}
-              loading="lazy"
-              decoding="async"
-              className="h-full w-full object-cover"
+            {hasValue(contacts.phoneDisplay) && (
+              <div>
+                📞{" "}
+                {hasValue(contacts.phoneHref) ? (
+                  <a
+                    href={`tel:${contacts.phoneHref.trim()}`}
+                    className="font-semibold hover:underline"
+                  >
+                    {contacts.phoneDisplay}
+                  </a>
+                ) : (
+                  <span className="font-semibold">{contacts.phoneDisplay}</span>
+                )}
+              </div>
+            )}
+            {hasValue(contacts.email) && (
+              <div>
+                ✉️{" "}
+                <a
+                  href={`mailto:${contacts.email.trim()}`}
+                  className="font-semibold hover:underline"
+                >
+                  {contacts.email}
+                </a>
+              </div>
+            )}
+            {hasValue(contacts.address) && <div>📍 {contacts.address}</div>}
+            <SocialLinks
+              contacts={contacts}
+              className="pt-1"
+              linkClassName="border border-white/30 bg-white/10 text-primary-foreground backdrop-blur hover:bg-white/20"
             />
           </div>
         </Reveal>

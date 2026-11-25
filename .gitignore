@@ -33,3 +33,9 @@ output
 *.njsproj
 *.sln
 *.sw?
+
+# Local upload fallback (production stores uploads in PostgreSQL)
+public/uploads
+
+# Local tool settings
+.claude/
