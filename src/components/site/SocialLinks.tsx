@@ -6,7 +6,7 @@ export function hasValue(value: string | undefined | null): value is string {
   return typeof value === "string" && value.trim() !== "";
 }
 
-function TikTokIcon({ className }: { className?: string }) {
+export function TikTokIcon({ className }: { className?: string }) {
   return (
     <svg
       viewBox="0 0 24 24"

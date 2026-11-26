@@ -17,7 +17,7 @@ const nav = [
 ];
 
 export function Header() {
-  const { contacts, houses, documents } = useSiteContent();
+  const { contacts, houses, documents, settings } = useSiteContent();
   const [open, setOpen] = useState(false);
   // Anchors of empty sections are not shown.
   const visibleNav = nav.filter(
@@ -29,7 +29,7 @@ export function Header() {
       <div className="container-x flex h-16 items-center justify-between md:h-20">
         <Link to="/" className="flex items-center gap-2.5">
           <img
-            src={logo}
+            src={hasValue(settings.logoUrl) ? settings.logoUrl.trim() : logo}
             alt="Wings Bucha"
             className="h-9 w-9 md:h-10 md:w-10"
             width={40}

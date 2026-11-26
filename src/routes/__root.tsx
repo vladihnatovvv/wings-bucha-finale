@@ -117,42 +117,49 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   // One request for all public content. It is rendered on the server and then reused in the
   // browser for 5 minutes, so Header, Footer, houses, documents, etc. do not refetch it.
   loader: () => readPublicContentFn(),
-  staleTime: 5 * 60_000,
-  head: () => ({
-    meta: [
-      { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Wings Bucha — Крила Бучі" },
-      {
-        name: "description",
-        content:
-          "Сучасне котеджне містечко серед природи у Бучі. єОселя, державні сертифікати, 15 хв до Києва.",
-      },
-      { name: "twitter:card", content: "summary_large_image" },
-      { property: "og:title", content: "Wings Bucha — Крила Бучі" },
-      { name: "twitter:title", content: "Wings Bucha — Крила Бучі" },
-      {
-        property: "og:description",
-        content:
-          "Сучасне котеджне містечко серед природи у Бучі. єОселя, державні сертифікати, 15 хв до Києва.",
-      },
-      {
-        name: "twitter:description",
-        content:
-          "Сучасне котеджне містечко серед природи у Бучі. єОселя, державні сертифікати, 15 хв до Києва.",
-      },
-      { property: "og:image", content: "/og-image.jpg" },
-      { name: "twitter:image", content: "/og-image.jpg" },
-      { property: "og:type", content: "website" },
-    ],
-    links: [
-      { rel: "icon", type: "image/webp", href: "/images/logo-wings.webp" },
-      {
-        rel: "stylesheet",
-        href: appCss,
-      },
-    ],
-  }),
+  staleTime: 30_000,
+  head: ({ loaderData }) => {
+    const brand = loaderData?.settings;
+    const ogImage = brand?.ogImageUrl?.trim() || "/og-image.jpg";
+    const favicon = brand?.faviconUrl?.trim();
+    return {
+      meta: [
+        { charSet: "utf-8" },
+        { name: "viewport", content: "width=device-width, initial-scale=1" },
+        { title: "Wings Bucha — Крила Бучі" },
+        {
+          name: "description",
+          content:
+            "Сучасне котеджне містечко серед природи у Бучі. єОселя, державні сертифікати, 15 хв до Києва.",
+        },
+        { name: "twitter:card", content: "summary_large_image" },
+        { property: "og:title", content: "Wings Bucha — Крила Бучі" },
+        { name: "twitter:title", content: "Wings Bucha — Крила Бучі" },
+        {
+          property: "og:description",
+          content:
+            "Сучасне котеджне містечко серед природи у Бучі. єОселя, державні сертифікати, 15 хв до Києва.",
+        },
+        {
+          name: "twitter:description",
+          content:
+            "Сучасне котеджне містечко серед природи у Бучі. єОселя, державні сертифікати, 15 хв до Києва.",
+        },
+        { property: "og:image", content: ogImage },
+        { name: "twitter:image", content: ogImage },
+        { property: "og:type", content: "website" },
+      ],
+      links: [
+        favicon
+          ? { rel: "icon", href: favicon }
+          : { rel: "icon", type: "image/webp", href: "/images/logo-wings.webp" },
+        {
+          rel: "stylesheet",
+          href: appCss,
+        },
+      ],
+    };
+  },
   shellComponent: RootShell,
   component: RootComponent,
   notFoundComponent: NotFoundComponent,

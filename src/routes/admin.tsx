@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import {
   Building2,
+  GripVertical,
   CheckCircle2,
   Clock3,
   FileText,
@@ -84,6 +85,7 @@ import {
   readSiteSettingsFn,
   saveConstructionUpdateFn,
   saveHouseFn,
+  reorderHousesFn,
   saveHouseTypeFn,
   saveSiteDocumentFn,
   updateLeadStatusFn,
@@ -343,6 +345,9 @@ function HousesAdmin({ onNotice }: { onNotice: (message: string) => void }) {
   const listHouseTypesServer = useServerFn(listHouseTypesFn);
   const saveHouseServer = useServerFn(saveHouseFn);
   const deleteHouseServer = useServerFn(deleteHouseFn);
+  const reorderHousesServer = useServerFn(reorderHousesFn);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
   const saveHouseTypeServer = useServerFn(saveHouseTypeFn);
   const deleteHouseTypeServer = useServerFn(deleteHouseTypeFn);
   const uploadAdminImageServer = useServerFn(uploadAdminImageFn);
@@ -381,6 +386,28 @@ function HousesAdmin({ onNotice }: { onNotice: (message: string) => void }) {
   function selectHouse(house: House) {
     setSelectedId(house.id);
     setDraft({ ...house, features: [...house.features] });
+  }
+
+  async function dropHouse(targetId: string) {
+    const fromId = dragId;
+    setDragId(null);
+    setOverId(null);
+    if (!fromId || fromId === targetId) return;
+    const previous = houses;
+    const from = houses.findIndex((house) => house.id === fromId);
+    const to = houses.findIndex((house) => house.id === targetId);
+    if (from < 0 || to < 0) return;
+    const next = [...houses];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    setHouses(next);
+    try {
+      await reorderHousesServer({ data: { ids: next.map((house) => house.id) } });
+      onNotice("Порядок об'єктів збережено.");
+    } catch {
+      setHouses(previous);
+      onNotice("Не вдалося зберегти порядок. Працює лише з підключеною базою.");
+    }
   }
 
   async function saveHouse() {
@@ -508,12 +535,68 @@ function HousesAdmin({ onNotice }: { onNotice: (message: string) => void }) {
       if (!value) return;
       setDraft((current) => {
         if (!current) return current;
-        return field === "img" ? { ...current, img: value } : { ...current, facade: value };
+        if (field === "facade") return { ...current, facade: value };
+        // The house page shows the facade photo, so keep it in sync unless it was set separately.
+        const facadeFollows = !current.facade || current.facade === current.img;
+        return { ...current, img: value, facade: facadeFollows ? value : current.facade };
       });
       onNotice("Фото додано. Натисніть зберегти, щоб закріпити зміни.");
     } catch {
       onNotice("Не вдалося прочитати фото. Спробуйте інший файл.");
     }
+  }
+
+  // Uploads a plan image (re-encoded to a compact JPEG) and returns its URL.
+  async function uploadPlanImage(file: File): Promise<string | null> {
+    if (!file.type.startsWith("image/")) {
+      onNotice("Оберіть файл зображення.");
+      return null;
+    }
+    try {
+      const optimized = await optimizeImageFile(file);
+      try {
+        const formData = new FormData();
+        formData.append("file", dataUrlToFile(optimized, file.name));
+        const uploaded = await uploadAdminImageServer({ data: formData });
+        onNotice("Планування додано. Натисніть зберегти, щоб закріпити зміни.");
+        return uploaded.url;
+      } catch {
+        onNotice("Планування додано. Натисніть зберегти, щоб закріпити зміни.");
+        return optimized;
+      }
+    } catch {
+      onNotice("Не вдалося прочитати фото. Спробуйте інший файл.");
+      return null;
+    }
+  }
+
+  function updateFloorPlan(index: number, patch: Partial<House["floorPlans"][number]>) {
+    setDraft((current) =>
+      current
+        ? {
+            ...current,
+            floorPlans: current.floorPlans.map((plan, i) =>
+              i === index ? { ...plan, ...patch } : plan,
+            ),
+          }
+        : current,
+    );
+  }
+
+  function addFloorPlan() {
+    if (!draft) return;
+    setDraft({
+      ...draft,
+      floorPlans: [
+        ...draft.floorPlans,
+        { label: `${draft.floorPlans.length + 1} поверх`, img: "" },
+      ],
+    });
+  }
+
+  function removeFloorPlan(index: number) {
+    if (!draft || draft.floorPlans.length <= 1) return;
+    setDraft({ ...draft, floorPlans: draft.floorPlans.filter((_, i) => i !== index) });
   }
 
   async function uploadHouseVideo(file: File) {
@@ -559,11 +642,16 @@ function HousesAdmin({ onNotice }: { onNotice: (message: string) => void }) {
   }
 
   function updateUnitPlan(index: number, patch: Partial<UnitPlan>) {
-    if (!draft) return;
-    setDraft({
-      ...draft,
-      unitPlans: draft.unitPlans.map((plan, i) => (i === index ? { ...plan, ...patch } : plan)),
-    });
+    setDraft((current) =>
+      current
+        ? {
+            ...current,
+            unitPlans: current.unitPlans.map((plan, i) =>
+              i === index ? { ...plan, ...patch } : plan,
+            ),
+          }
+        : current,
+    );
   }
 
   function addUnitPlan() {
@@ -666,14 +754,39 @@ function HousesAdmin({ onNotice }: { onNotice: (message: string) => void }) {
           </div>
         </div>
         <div className="divide-y divide-border">
-          {houses.map((house) => (
+          {houses.map((house, index) => (
             <button
               key={house.id}
+              draggable
+              onDragStart={(event) => {
+                setDragId(house.id);
+                event.dataTransfer.effectAllowed = "move";
+              }}
+              onDragOver={(event) => {
+                event.preventDefault();
+                if (overId !== house.id) setOverId(house.id);
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
+                void dropHouse(house.id);
+              }}
+              onDragEnd={() => {
+                setDragId(null);
+                setOverId(null);
+              }}
               onClick={() => selectHouse(house)}
-              className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors ${
+              className={`flex w-full cursor-grab items-center gap-3 px-4 py-3 text-left transition-colors active:cursor-grabbing ${
                 house.id === draft.id ? "bg-primary-soft" : "hover:bg-secondary/60"
+              } ${dragId === house.id ? "opacity-40" : ""} ${
+                overId === house.id && dragId && dragId !== house.id
+                  ? "shadow-[inset_0_2px_0_0_var(--color-primary)]"
+                  : ""
               }`}
             >
+              <span className="flex w-6 shrink-0 flex-col items-center text-muted-foreground">
+                <GripVertical className="h-4 w-4" />
+                <span className="text-[10px] font-semibold tabular-nums">{index + 1}</span>
+              </span>
               <img src={house.img} alt="" className="h-12 w-16 rounded-md object-cover" />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-bold">{house.name}</span>
@@ -848,6 +961,55 @@ function HousesAdmin({ onNotice }: { onNotice: (message: string) => void }) {
         <div className="mt-6 rounded-lg border border-border bg-secondary/30 p-4">
           <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
+              <h3 className="text-sm font-bold">Планування поверхів</h3>
+              <p className="text-xs text-muted-foreground">
+                Зображення на вкладці «Планування поверху» на сторінці об'єкта.
+              </p>
+            </div>
+            <button
+              onClick={addFloorPlan}
+              className="inline-flex items-center justify-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-xs font-semibold hover:border-primary hover:text-primary"
+            >
+              <Plus className="h-4 w-4" />
+              Додати поверх
+            </button>
+          </div>
+          <div className="grid gap-3">
+            {draft.floorPlans.map((plan, index) => (
+              <div
+                key={index}
+                className="grid gap-3 rounded-md border border-border bg-background p-3 md:grid-cols-[1fr_auto]"
+              >
+                <TextField
+                  label="Назва поверху"
+                  value={plan.label}
+                  onChange={(value) => updateFloorPlan(index, { label: value })}
+                />
+                <button
+                  onClick={() => removeFloorPlan(index)}
+                  disabled={draft.floorPlans.length <= 1}
+                  className="inline-flex h-10 items-center justify-center self-end rounded-md border border-border px-3 text-destructive hover:border-destructive disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+                <ImageUploadField
+                  label={`Зображення поверху ${index + 1}`}
+                  value={plan.img}
+                  onChange={(value) => updateFloorPlan(index, { img: value })}
+                  onFile={async (file) => {
+                    const url = await uploadPlanImage(file);
+                    if (url) updateFloorPlan(index, { img: url });
+                  }}
+                  className="md:col-span-2"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-6 rounded-lg border border-border bg-secondary/30 p-4">
+          <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
               <h3 className="text-sm font-bold">Планування квартир / секцій</h3>
               <p className="text-xs text-muted-foreground">
                 Тут ставиться статус для конкретного планування: вільно, резерв або продано.
@@ -905,10 +1067,14 @@ function HousesAdmin({ onNotice }: { onNotice: (message: string) => void }) {
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
-                <TextField
-                  label="URL зображення планування"
+                <ImageUploadField
+                  label={`Зображення планування ${index + 1} (квартира/секція)`}
                   value={plan.img}
                   onChange={(value) => updateUnitPlan(index, { img: value })}
+                  onFile={async (file) => {
+                    const url = await uploadPlanImage(file);
+                    if (url) updateUnitPlan(index, { img: url });
+                  }}
                   className="md:col-span-5"
                 />
               </div>
@@ -2485,6 +2651,7 @@ function MediaAdmin({ onNotice }: { onNotice: (message: string) => void }) {
   const readSettingsServer = useServerFn(readSiteSettingsFn);
   const writeSettingsServer = useServerFn(writeSiteSettingsFn);
   const uploadFileServer = useServerFn(uploadAdminFileFn);
+  const uploadImageServer = useServerFn(uploadAdminImageFn);
   const [settings, setSettings] = useState<SiteSettings>(() => readSiteSettings());
 
   useEffect(() => {
@@ -2514,6 +2681,45 @@ function MediaAdmin({ onNotice }: { onNotice: (message: string) => void }) {
       onNotice("Відео додано. Натисніть зберегти.");
     } catch {
       onNotice("Не вдалося завантажити відео. Можна вставити URL вручну.");
+    }
+  }
+
+  async function uploadPoster(file: File, field: "heroPosterUrl" | "scrollPosterUrl") {
+    if (!file.type.startsWith("image/")) {
+      onNotice("Оберіть файл зображення.");
+      return;
+    }
+    try {
+      // Re-encode to a resized JPEG so the preview stays small.
+      const optimized = await optimizeImageFile(file);
+      const formData = new FormData();
+      formData.append("file", dataUrlToFile(optimized, file.name));
+      const uploaded = await uploadImageServer({ data: formData });
+      setSettings((current) => ({ ...current, [field]: uploaded.url }));
+      onNotice("Прев'ю додано. Натисніть зберегти.");
+    } catch {
+      onNotice("Не вдалося завантажити прев'ю. Можна вставити URL вручну.");
+    }
+  }
+
+  async function uploadBrand(file: File, field: "logoUrl" | "faviconUrl" | "ogImageUrl") {
+    if (!file.type.startsWith("image/")) {
+      onNotice("Оберіть файл зображення.");
+      return;
+    }
+    try {
+      // Logo and icon keep transparency (WebP); the link preview is a regular JPEG.
+      const encoded =
+        field === "ogImageUrl"
+          ? await optimizeImageFile(file)
+          : await optimizeTransparentImage(file, field === "faviconUrl" ? 256 : 512);
+      const formData = new FormData();
+      formData.append("file", dataUrlToFile(encoded, file.name));
+      const uploaded = await uploadImageServer({ data: formData });
+      setSettings((current) => ({ ...current, [field]: uploaded.url }));
+      onNotice("Зображення додано. Натисніть зберегти.");
+    } catch {
+      onNotice("Не вдалося завантажити зображення. Можна вставити URL вручну.");
     }
   }
 
@@ -2562,6 +2768,33 @@ function MediaAdmin({ onNotice }: { onNotice: (message: string) => void }) {
         </div>
       </div>
       <div className="grid gap-8">
+        <div className="grid gap-4 rounded-lg border border-border p-4">
+          <h3 className="text-sm font-bold">Бренд і посилання</h3>
+          <ImageUploadField
+            label="Логотип (шапка і футер)"
+            value={settings.logoUrl}
+            onChange={(value) => setSettings({ ...settings, logoUrl: value })}
+            onFile={(file) => uploadBrand(file, "logoUrl")}
+          />
+          <ImageUploadField
+            label="Іконка вкладки браузера (favicon)"
+            value={settings.faviconUrl}
+            onChange={(value) => setSettings({ ...settings, faviconUrl: value })}
+            onFile={(file) => uploadBrand(file, "faviconUrl")}
+          />
+          <ImageUploadField
+            label="Картинка для прев'ю посилання (месенджери, соцмережі)"
+            value={settings.ogImageUrl}
+            onChange={(value) => setSettings({ ...settings, ogImageUrl: value })}
+            onFile={(file) => uploadBrand(file, "ogImageUrl")}
+          />
+          <p className="text-xs text-muted-foreground">
+            Порожнє поле означає стандартну картинку. Логотип і іконка: квадратне зображення, бажано
+            з прозорим фоном (PNG/WebP). Прев'ю посилання: горизонтальне фото, бажано 1200×630.
+            Месенджери кешують прев'ю, тож після зміни воно оновиться не одразу.
+          </p>
+        </div>
+
         <div>
           <FileUploadField
             label="Відео головного екрана (Hero)"
@@ -2576,6 +2809,13 @@ function MediaAdmin({ onNotice }: { onNotice: (message: string) => void }) {
             WebM, бажано до 10 МБ та вертикального формату 4:5. Посилання Google Drive і YouTube не
             працюють.
           </p>
+          <ImageUploadField
+            label="Прев'ю відео головного екрана (JPG, PNG, WebP)"
+            value={settings.heroPosterUrl}
+            onChange={(value) => setSettings({ ...settings, heroPosterUrl: value })}
+            onFile={(file) => uploadPoster(file, "heroPosterUrl")}
+            className="mt-4"
+          />
           {settings.heroVideoUrl && /drive\.google\.|youtu\.?be/i.test(settings.heroVideoUrl) && (
             <p className="mt-2 text-xs font-semibold text-destructive">
               Це посилання на сторінку перегляду, а не на відеофайл, воно не відтворюється.
@@ -2602,6 +2842,21 @@ function MediaAdmin({ onNotice }: { onNotice: (message: string) => void }) {
             onChange={(value) => setSettings({ ...settings, scrollMediaVideoUrl: value })}
             onFile={(file) => uploadVideo(file, "scrollMediaVideoUrl")}
           />
+          <ImageUploadField
+            label="Прев'ю відеозаставки (JPG, PNG, WebP)"
+            value={settings.scrollPosterUrl}
+            onChange={(value) => setSettings({ ...settings, scrollPosterUrl: value })}
+            onFile={(file) => uploadPoster(file, "scrollPosterUrl")}
+            className="mt-4"
+          />
+          <label className="mt-3 flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={settings.scrollMediaSound}
+              onChange={(e) => setSettings({ ...settings, scrollMediaSound: e.target.checked })}
+            />
+            Відтворювати зі звуком (браузер може вимагати першого кліку на сторінці)
+          </label>
           {settings.scrollMediaVideoUrl && (
             <video
               src={settings.scrollMediaVideoUrl}
@@ -2721,6 +2976,33 @@ function optimizeImageFile(file: File): Promise<string> {
       reject(new Error("Image failed to load"));
     };
 
+    image.src = objectUrl;
+  });
+}
+
+// Like optimizeImageFile, but encodes WebP so a transparent background survives.
+function optimizeTransparentImage(file: File, maxSize: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const scale = Math.min(1, maxSize / Math.max(image.naturalWidth, image.naturalHeight));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+      const context = canvas.getContext("2d");
+      if (!context) {
+        reject(new Error("Canvas context is unavailable"));
+        return;
+      }
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL("image/webp", 0.92));
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Image failed to load"));
+    };
     image.src = objectUrl;
   });
 }

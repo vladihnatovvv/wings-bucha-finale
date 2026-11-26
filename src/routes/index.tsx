@@ -16,6 +16,8 @@ import {
   Leaf,
   ArrowRight,
   CheckCircle2,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useState, useRef } from "react";
 import { motion, useScroll, useTransform, useSpring, AnimatePresence } from "motion/react";
@@ -104,8 +106,8 @@ function Index() {
       />
       <Header />
       <main>
-        <Hero content={sections.hero} videoUrl={settings.heroVideoUrl} />
-        <ScrollVideo videoUrl={settings.scrollMediaVideoUrl} />
+        <Hero content={sections.hero} videoUrl={settings.heroVideoUrl} posterUrl={settings.heroPosterUrl} />
+        <ScrollVideo videoUrl={settings.scrollMediaVideoUrl} posterUrl={settings.scrollPosterUrl} sound={settings.scrollMediaSound} />
         <Marquee items={sections.marquee} />
         <About content={sections.about} />
         <LazyOnView anchorId="houses" minHeight="70vh">
@@ -168,7 +170,15 @@ function LazyOnView({
 }
 
 /* ───────── HERO ───────── */
-function Hero({ content, videoUrl }: { content: HeroSection; videoUrl?: string }) {
+function Hero({
+  content,
+  videoUrl,
+  posterUrl,
+}: {
+  content: HeroSection;
+  videoUrl?: string;
+  posterUrl?: string;
+}) {
   const { houses } = useSiteContent();
   const ref = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -349,7 +359,7 @@ function Hero({ content, videoUrl }: { content: HeroSection; videoUrl?: string }
                 key={heroVideo}
                 ref={videoRef}
                 src={heroVideo}
-                poster={customImage || heroHouseMedium}
+                poster={(hasValue(posterUrl) ? posterUrl.trim() : "") || customImage || heroHouseMedium}
                 autoPlay
                 muted
                 loop
@@ -456,8 +466,18 @@ function HeroStat({ value, label, italic }: { value: string; label: string; ital
 }
 
 /* ───────── SCROLL MEDIA ───────── */
-function ScrollVideo({ videoUrl }: { videoUrl: string }) {
+function ScrollVideo({
+  videoUrl,
+  posterUrl,
+  sound,
+}: {
+  videoUrl: string;
+  posterUrl?: string;
+  sound: boolean;
+}) {
   const ref = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [muted, setMuted] = useState(true);
   const [loadVideo, setLoadVideo] = useState(false);
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
 
@@ -483,6 +503,40 @@ function ScrollVideo({ videoUrl }: { videoUrl: string }) {
     return () => observer.disconnect();
   }, [loadVideo]);
 
+  // Try to play with sound; browsers block it before a user gesture, so fall back to muted
+  // and unmute on the first interaction.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !loadVideo || !sound) return;
+    let cleanup = () => {};
+    video.muted = false;
+    video.play().then(
+      () => setMuted(false),
+      () => {
+        video.muted = true;
+        video.play().catch(() => {});
+        const unlock = () => {
+          video.muted = false;
+          video.play().then(() => setMuted(false), () => {
+            video.muted = true;
+          });
+          cleanup();
+        };
+        const events = ["pointerdown", "keydown", "touchstart"] as const;
+        events.forEach((e) => window.addEventListener(e, unlock, { once: true }));
+        cleanup = () => events.forEach((e) => window.removeEventListener(e, unlock));
+      },
+    );
+    return () => cleanup();
+  }, [loadVideo, sound, activeVideo]);
+
+  const toggleMute = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.muted = !video.muted;
+    setMuted(video.muted);
+  };
+
   return (
     <section ref={ref} className="relative h-[300vh] bg-background md:h-[500vh]">
       <div className="sticky top-0 flex h-screen w-full items-center justify-center overflow-hidden bg-background">
@@ -492,8 +546,9 @@ function ScrollVideo({ videoUrl }: { videoUrl: string }) {
         >
           {activeVideo ? (
             <video
+              ref={videoRef}
               src={loadVideo ? activeVideo : undefined}
-              poster={loadVideo ? heroPoster : undefined}
+              poster={loadVideo ? posterUrl?.trim() || heroPoster : undefined}
               autoPlay
               muted
               loop
@@ -510,6 +565,16 @@ function ScrollVideo({ videoUrl }: { videoUrl: string }) {
             />
           )}
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent" />
+          {activeVideo && sound && (
+            <button
+              type="button"
+              onClick={toggleMute}
+              aria-label={muted ? "Увімкнути звук" : "Вимкнути звук"}
+              className="absolute bottom-4 right-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur transition-transform hover:scale-110"
+            >
+              {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+            </button>
+          )}
         </motion.div>
       </div>
     </section>

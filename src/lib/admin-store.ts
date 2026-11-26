@@ -143,6 +143,15 @@ export type SiteSections = {
 
 export type SiteSettings = {
   scrollMediaVideoUrl: string;
+  /** Play the second-section video with sound (browser may require a first click). */
+  scrollMediaSound: boolean;
+  /** Preview image shown before the video loads. Empty means the default image. */
+  heroPosterUrl: string;
+  scrollPosterUrl: string;
+  /** Site logo (header, footer), browser tab icon and link-preview image. Empty = built-in. */
+  logoUrl: string;
+  faviconUrl: string;
+  ogImageUrl: string;
   /** Video for the main hero screen. Empty means the hero photo is shown. */
   heroVideoUrl: string;
   sections?: SiteSections;
@@ -429,6 +438,12 @@ export function mergeSections(
 
 export const DEFAULT_SITE_SETTINGS: SiteSettings = {
   scrollMediaVideoUrl: siteAsset("videos/hero-web.mp4"),
+  scrollMediaSound: true,
+  heroPosterUrl: "",
+  scrollPosterUrl: "",
+  logoUrl: "",
+  faviconUrl: "",
+  ogImageUrl: "",
   heroVideoUrl: "",
   sections: DEFAULT_SITE_SECTIONS,
 };
@@ -534,6 +549,12 @@ export function readSiteSettings(): SiteSettings {
   const settings = safeParse<Partial<SiteSettings>>(localStorage.getItem(SETTINGS_STORAGE_KEY), {});
   return {
     scrollMediaVideoUrl: settings.scrollMediaVideoUrl ?? DEFAULT_SITE_SETTINGS.scrollMediaVideoUrl,
+    scrollMediaSound: settings.scrollMediaSound ?? true,
+    heroPosterUrl: settings.heroPosterUrl ?? "",
+    scrollPosterUrl: settings.scrollPosterUrl ?? "",
+    logoUrl: settings.logoUrl ?? "",
+    faviconUrl: settings.faviconUrl ?? "",
+    ogImageUrl: settings.ogImageUrl ?? "",
     heroVideoUrl: settings.heroVideoUrl ?? "",
     sections: mergeSections(DEFAULT_SITE_SECTIONS, settings.sections),
   };

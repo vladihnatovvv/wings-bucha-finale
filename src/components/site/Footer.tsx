@@ -15,7 +15,13 @@ export function Footer() {
         <div className="grid gap-10 md:grid-cols-4">
           <div className="md:col-span-2">
             <div className="flex items-center gap-2.5">
-              <img src={logo} alt="Wings Bucha" className="h-10 w-10" width={40} height={40} />
+              <img
+                src={hasValue(settings.logoUrl) ? settings.logoUrl.trim() : logo}
+                alt="Wings Bucha"
+                className="h-10 w-10"
+                width={40}
+                height={40}
+              />
               <div>
                 <div className="text-base font-bold">WINGS BUCHA</div>
                 <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">

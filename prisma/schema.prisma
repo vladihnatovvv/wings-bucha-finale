@@ -33,6 +33,7 @@ model House {
   priceUah      Int?     @map("price_uah")
   priceCurrency String   @default("USD") @map("price_currency")
   available     Int
+  sortOrder     Int      @default(0) @map("sort_order")
   features      String[]
   floorPlans    Json     @map("floor_plans")
   unitPlans     Json     @map("unit_plans")
@@ -101,6 +102,12 @@ model SiteSettings {
   id                  Int      @id @default(1)
   scrollMediaVideoUrl String   @default("") @map("scroll_media_video_url") @db.Text
   heroVideoUrl        String   @default("") @map("hero_video_url") @db.Text
+  heroPosterUrl       String   @default("") @map("hero_poster_url") @db.Text
+  scrollPosterUrl     String   @default("") @map("scroll_poster_url") @db.Text
+  logoUrl             String   @default("") @map("logo_url") @db.Text
+  faviconUrl          String   @default("") @map("favicon_url") @db.Text
+  ogImageUrl          String   @default("") @map("og_image_url") @db.Text
+  scrollMediaSound    Boolean  @default(true) @map("scroll_media_sound")
   sectionsContent     Json?    @map("sections_content")
   updatedAt           DateTime @updatedAt @map("updated_at")
 

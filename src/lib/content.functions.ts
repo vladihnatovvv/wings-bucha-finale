@@ -56,6 +56,14 @@ export const saveHouseFn = createServerFn({ method: "POST" })
     return repo.saveHouse(data);
   });
 
+export const reorderHousesFn = createServerFn({ method: "POST" })
+  .validator((data: { ids: string[] }) => data)
+  .handler(async ({ data }) => {
+    await requireAdmin();
+    const repo = await import("./server/content-repository");
+    return repo.reorderHouses(data.ids);
+  });
+
 export const deleteHouseFn = createServerFn({ method: "POST" })
   .validator((data: { id: string }) => data)
   .handler(async ({ data }) => {

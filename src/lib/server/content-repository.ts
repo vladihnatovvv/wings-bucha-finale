@@ -147,6 +147,12 @@ function toSiteSettings(row: DbSiteSettings): SiteSettings {
     Partial<SiteSections> | null | undefined;
   return {
     scrollMediaVideoUrl: row.scrollMediaVideoUrl || DEFAULT_SITE_SETTINGS.scrollMediaVideoUrl,
+    scrollMediaSound: (row as { scrollMediaSound?: boolean }).scrollMediaSound ?? true,
+    heroPosterUrl: (row as { heroPosterUrl?: string }).heroPosterUrl ?? "",
+    scrollPosterUrl: (row as { scrollPosterUrl?: string }).scrollPosterUrl ?? "",
+    logoUrl: (row as { logoUrl?: string }).logoUrl ?? "",
+    faviconUrl: (row as { faviconUrl?: string }).faviconUrl ?? "",
+    ogImageUrl: (row as { ogImageUrl?: string }).ogImageUrl ?? "",
     heroVideoUrl: row.heroVideoUrl,
     sections: mergeSections(DEFAULT_SITE_SECTIONS, sectionsContent),
   };
@@ -154,7 +160,9 @@ function toSiteSettings(row: DbSiteSettings): SiteSettings {
 
 export async function listHouses(): Promise<House[]> {
   if (!hasDatabaseUrl()) return DEFAULT_HOUSES;
-  const rows = await prisma.house.findMany({ orderBy: { createdAt: "asc" } });
+  const rows = await prisma.house.findMany({
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }, { id: "asc" }],
+  });
   return rows.map(toHouse);
 }
 
@@ -205,6 +213,9 @@ export async function getHouseById(id: string): Promise<House | undefined> {
 
 async function saveHouseImpl(house: House): Promise<House> {
   requireDb();
+  // New houses go to the end of the list; existing ones keep their position.
+  const last = await prisma.house.aggregate({ _max: { sortOrder: true } });
+  const nextOrder = (last._max.sortOrder ?? 0) + 1;
   const row = await prisma.house.upsert({
     where: { id: house.id },
     update: {
@@ -242,12 +253,23 @@ async function saveHouseImpl(house: House): Promise<House> {
       priceUah: house.priceUah,
       priceCurrency: house.priceCurrency ?? "USD",
       available: house.available,
+      sortOrder: nextOrder,
       features: house.features,
       floorPlans: house.floorPlans,
       unitPlans: house.unitPlans,
     },
   });
   return toHouse(row);
+}
+
+async function reorderHousesImpl(ids: string[]) {
+  requireDb();
+  await prisma.$transaction(
+    ids.map((id, index) =>
+      prisma.house.updateMany({ where: { id }, data: { sortOrder: index + 1 } }),
+    ),
+  );
+  return { ok: true };
 }
 
 async function deleteHouseImpl(id: string) {
@@ -396,6 +418,12 @@ async function writeSiteSettingsImpl(settings: SiteSettings): Promise<SiteSettin
   requireDb();
   const payload = {
     scrollMediaVideoUrl: settings.scrollMediaVideoUrl,
+    scrollMediaSound: settings.scrollMediaSound ?? true,
+    heroPosterUrl: settings.heroPosterUrl ?? "",
+    scrollPosterUrl: settings.scrollPosterUrl ?? "",
+    logoUrl: settings.logoUrl ?? "",
+    faviconUrl: settings.faviconUrl ?? "",
+    ogImageUrl: settings.ogImageUrl ?? "",
     heroVideoUrl: settings.heroVideoUrl ?? "",
     sectionsContent: (settings.sections ?? DEFAULT_SITE_SECTIONS) as any,
   };
@@ -416,6 +444,12 @@ async function writeSiteSettingsImpl(settings: SiteSettings): Promise<SiteSettin
     });
     return {
       scrollMediaVideoUrl: row.scrollMediaVideoUrl,
+      scrollMediaSound: settings.scrollMediaSound ?? true,
+      heroPosterUrl: settings.heroPosterUrl ?? "",
+      scrollPosterUrl: settings.scrollPosterUrl ?? "",
+      logoUrl: settings.logoUrl ?? "",
+      faviconUrl: settings.faviconUrl ?? "",
+      ogImageUrl: settings.ogImageUrl ?? "",
       heroVideoUrl: settings.heroVideoUrl ?? "",
       sections: settings.sections ?? DEFAULT_SITE_SECTIONS,
     };
@@ -435,6 +469,7 @@ function invalidating<A extends unknown[], R>(write: (...args: A) => Promise<R>)
 
 export const saveHouse = invalidating(saveHouseImpl);
 export const deleteHouse = invalidating(deleteHouseImpl);
+export const reorderHouses = invalidating(reorderHousesImpl);
 export const saveHouseType = invalidating(saveHouseTypeImpl);
 export const deleteHouseType = invalidating(deleteHouseTypeImpl);
 export const writeSiteContacts = invalidating(writeSiteContactsImpl);
