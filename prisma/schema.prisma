@@ -51,6 +51,7 @@ model Lead {
   email     String   @default("")
   interest  String   @default("")
   message   String   @default("") @db.Text
+  siteName  String   @default("Крила Бучі") @map("site_name")
   status    String   @default("new")
 
   @@map("leads")

@@ -10,6 +10,7 @@ export type Lead = {
   email: string;
   interest: string;
   message: string;
+  site_name: string;
   status: LeadStatus;
 };
 

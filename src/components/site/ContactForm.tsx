@@ -32,12 +32,15 @@ export function ContactForm() {
       email: String(fd.get("email") ?? "").trim(),
       interest: String(fd.get("interest") ?? "").trim(),
       message: String(fd.get("message") ?? "").trim(),
+      site_name: "Крила Бучі",
+      website: String(fd.get("website") ?? ""),
     };
 
     try {
       await createLeadServer({ data: lead });
     } catch {
-      addLead(lead);
+      const { website: _hp, ...local } = lead;
+      addLead(local);
     }
 
     window.setTimeout(() => {
@@ -49,6 +52,15 @@ export function ContactForm() {
 
   return (
     <form onSubmit={onSubmit} className="grid gap-4">
+      {/* Honeypot: hidden from people, bots fill it. */}
+      <input
+        type="text"
+        name="website"
+        tabIndex={-1}
+        autoComplete="off"
+        aria-hidden="true"
+        className="absolute left-[-9999px] h-0 w-0 opacity-0"
+      />
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="Ім'я" name="name" placeholder="Ваше ім'я" maxLength={80} required />
         <Field

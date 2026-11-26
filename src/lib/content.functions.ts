@@ -7,6 +7,7 @@ import type {
   SiteDocument,
   SiteSettings,
 } from "@/lib/admin-store";
+import type { LeadInput } from "./server/lead-guard";
 import type { House, HouseType } from "@/lib/houses";
 
 async function requireAdmin() {
@@ -100,10 +101,15 @@ export const listLeadsFn = createServerFn({ method: "GET" }).handler(async () =>
 });
 
 export const createLeadFn = createServerFn({ method: "POST" })
-  .validator((data: Omit<Lead, "id" | "createdAt" | "status">) => data)
+  .validator((data: LeadInput) => data)
   .handler(async ({ data }) => {
+    const { guardLead } = await import("./server/lead-guard");
+    const clean = guardLead(data);
+    // Spam/invalid: pretend success, save nothing, send nothing to the CRM.
+    if (!clean) return { ok: true };
     const repo = await import("./server/content-repository");
-    return repo.createLead(data);
+    await repo.createLead(clean);
+    return { ok: true };
   });
 
 export const updateLeadStatusFn = createServerFn({ method: "POST" })

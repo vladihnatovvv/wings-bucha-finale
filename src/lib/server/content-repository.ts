@@ -1,3 +1,4 @@
+import { sendLeadToCrm } from "@/lib/server/crm";
 import type {
   House as DbHouse,
   HouseType as DbHouseType,
@@ -98,6 +99,7 @@ function toLead(row: DbLead): Lead {
     email: row.email,
     interest: row.interest,
     message: row.message,
+    site_name: row.siteName,
     status: normalizeLeadStatus(row.status),
   };
 }
@@ -319,9 +321,13 @@ export async function createLead(input: Omit<Lead, "id" | "createdAt" | "status"
       email: input.email,
       interest: input.interest,
       message: input.message,
+      siteName: input.site_name || "Крила Бучі",
     },
   });
-  return toLead(row);
+  const lead = toLead(row);
+  // Lead is already saved locally; CRM delivery is best-effort and must not fail the request.
+  await sendLeadToCrm(lead);
+  return lead;
 }
 
 export async function updateLeadStatus(id: string, status: LeadStatus): Promise<Lead> {

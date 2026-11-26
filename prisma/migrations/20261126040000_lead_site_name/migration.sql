@@ -1,0 +1,1 @@
+ALTER TABLE "leads" ADD COLUMN IF NOT EXISTS "site_name" TEXT NOT NULL DEFAULT 'Крила Бучі';

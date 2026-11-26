@@ -39,3 +39,8 @@ public/uploads
 
 # Local tool settings
 .claude/
+
+# Local secrets
+.env
+.env.*
+!.env.example
