@@ -22,7 +22,7 @@ import {
   Users,
   Video,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import {
   DEFAULT_HOUSES,
   addHouseType,
@@ -2341,10 +2341,17 @@ function DocumentsAdmin({ onNotice }: { onNotice: (message: string) => void }) {
       const formData = new FormData();
       formData.append("file", file);
       const uploaded = await uploadFileServer({ data: formData });
+      if (!uploaded?.url) {
+        console.error("Document upload returned no url", uploaded);
+        onNotice("Сервер не повернув URL файлу. Можна вставити URL вручну.");
+        return;
+      }
       updateDocument(id, { fileUrl: uploaded.url });
       onNotice("Файл додано. Натисніть зберегти, щоб закріпити документ.");
-    } catch {
-      onNotice("Не вдалося завантажити файл. Можна вставити URL вручну.");
+    } catch (error) {
+      console.error("Document upload failed", error);
+      const reason = error instanceof Error ? error.message : String(error);
+      onNotice(`Не вдалося завантажити файл (${reason}). Можна вставити URL вручну.`);
     }
   }
 
@@ -3032,7 +3039,7 @@ function ImageUploadField({
   className?: string;
 }) {
   const [dragging, setDragging] = useState(false);
-  const inputId = `image-upload-${label.toLowerCase().replace(/[^a-zа-яіїєґ0-9]+/gi, "-")}`;
+  const inputId = `image-upload-${useId()}`;
 
   function handleFiles(files: FileList | null) {
     const file = files?.[0];
@@ -3130,7 +3137,8 @@ function FileUploadField({
   className?: string;
 }) {
   const [dragging, setDragging] = useState(false);
-  const inputId = `file-upload-${label.toLowerCase().replace(/[^a-zа-яіїєґ0-9]+/gi, "-")}`;
+  // Must be unique per field instance: several cards share the same label.
+  const inputId = `file-upload-${useId()}`;
 
   function handleFiles(files: FileList | null) {
     const file = files?.[0];
